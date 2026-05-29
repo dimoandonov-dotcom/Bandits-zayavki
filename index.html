@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sandwich Bandits — Заявки</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bandits">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf0;min-height:100vh;overscroll-behavior:none}
+
+/* ── UPLOAD ── */
+#upl{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 20px;background:radial-gradient(ellipse at 50% 0%,#1a2a3a,#0f1117 65%)}
+.logo{font-size:36px;font-weight:900;letter-spacing:4px;color:#f5a623;text-align:center}
+.logo-s{font-size:11px;font-weight:700;letter-spacing:3px;color:#555;text-align:center;margin-bottom:40px}
+.drop-card{background:#1b1f2b;border:2px dashed #2c3347;border-radius:16px;padding:32px 20px;width:100%;max-width:400px;text-align:center;position:relative;transition:.2s}
+.drop-card input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:44px;margin-bottom:12px}
+.drop-t{font-size:17px;font-weight:700;margin-bottom:6px}
+.drop-h{font-size:13px;color:#555;line-height:1.5}
+.or{display:flex;align-items:center;gap:10px;color:#555;font-size:12px;font-weight:600;margin:16px 0;width:100%;max-width:400px}
+.or::before,.or::after{content:'';flex:1;height:1px;background:#2c3347}
+.btn-new{background:linear-gradient(135deg,#f5a623,#e8960f);color:#111;font-weight:800;font-size:15px;border:none;border-radius:12px;padding:14px;cursor:pointer;width:100%;max-width:400px}
+
+/* ── APP ── */
+#app{display:none;flex-direction:column;min-height:100vh}
+#app.show{display:flex}
+
+/* Header */
+.hdr{background:#1b1f2b;border-bottom:1px solid #2c3347;padding:11px 14px;position:sticky;top:0;z-index:60}
+.hdr-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.hdr-title{font-size:18px;font-weight:900;letter-spacing:2px;color:#f5a623}
+.hdr-btns{display:flex;gap:6px}
+.btn-hdr{font-size:12px;font-weight:700;border:none;border-radius:8px;padding:7px 12px;cursor:pointer}
+.btn-hdr:active{opacity:.8}
+.btn-back-hdr{background:#2c3347;color:#888}
+.btn-print-hdr{background:#f5a623;color:#111}
+.date-row{display:flex;gap:6px;flex-wrap:wrap}
+.di{background:#0f1117;border:1px solid #2c3347;border-radius:7px;color:#e8eaf0;font-size:12px;font-weight:600;padding:6px 8px;outline:none;flex:1;min-width:80px}
+.di:focus{border-color:#f5a623}
+.di-sel{background:#0f1117;border:1px solid #2c3347;border-radius:7px;color:#e8eaf0;font-size:12px;font-weight:600;padding:6px 8px;outline:none;flex:1;appearance:none;cursor:pointer}
+
+/* District tabs */
+.dtabs{display:flex;gap:5px;padding:9px 14px;background:#0f1117;border-bottom:1px solid #2c3347;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.dtab{font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid #2c3347;background:transparent;color:#555;cursor:pointer;white-space:nowrap;transition:.15s}
+.dtab.active{background:#f5a623;border-color:#f5a623;color:#111}
+
+/* Object list */
+#objList{padding:10px 14px 100px;display:flex;flex-direction:column;gap:5px}
+.obj-btn{background:#1b1f2b;border:1px solid #2c3347;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;width:100%;text-align:left;transition:.15s;border-left:3px solid #2c3347}
+.obj-btn.has-data{border-left-color:#66bb6a}
+.obj-btn.changed{border-left-color:#4fc3f7;background:#1a2535}
+.obj-btn:active{background:#242838}
+.obj-name{font-size:14px;font-weight:700;color:#e8eaf0}
+.obj-badge{font-size:12px;font-weight:700;background:#242838;color:#4fc3f7;padding:3px 10px;border-radius:12px}
+
+/* Edit view */
+#editView{display:none;flex-direction:column;flex:1}
+#editView.show{display:flex}
+.edit-hdr{background:#242838;border-bottom:1px solid #2c3347;padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:55}
+.btn-back-obj{background:#1b1f2b;border:1px solid #2c3347;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;color:#888;cursor:pointer}
+.edit-obj-name{font-size:18px;font-weight:900;color:#f5a623;flex:1;letter-spacing:1px}
+.edit-obj-tot{font-size:13px;font-weight:700;color:#66bb6a}
+.edit-body{padding:10px 14px;padding-bottom:100px}
+
+/* Category block */
+.cat-blk{background:#1b1f2b;border:1px solid #2c3347;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.cat-hdr{background:#242838;padding:9px 14px;display:flex;align-items:center;justify-content:space-between}
+.cat-n{font-size:15px;font-weight:900;color:#f5a623;letter-spacing:1px}
+.cat-tot{font-size:11px;font-weight:700;background:#f5a623;color:#111;padding:2px 10px;border-radius:12px}
+
+/* Item row */
+.irow{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid #2c3347;gap:8px}
+.irow:last-child{border-bottom:none}
+.iname{flex:1;font-size:14px;font-weight:500}
+.qwrap{display:flex;align-items:center;gap:5px}
+.qbtn{width:34px;height:34px;background:#242838;border:1px solid #2c3347;border-radius:8px;color:#e8eaf0;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.1s}
+.qbtn:active{background:#f5a623;color:#111;border-color:#f5a623}
+.qinp{width:52px;background:#0f1117;border:1px solid #2c3347;border-radius:8px;color:#e8eaf0;font-size:16px;font-weight:700;text-align:center;padding:5px 3px;outline:none;-moz-appearance:textfield}
+.qinp::-webkit-outer-spin-button,.qinp::-webkit-inner-spin-button{-webkit-appearance:none}
+.qinp:focus{border-color:#f5a623}
+.qinp.chg{border-color:#4fc3f7;color:#4fc3f7;background:#1a3a5c;box-shadow:0 0 0 2px rgba(79,195,247,0.3)}
+
+/* Totals view */
+#totView{display:none;padding:10px 14px;padding-bottom:100px}
+#totView.show{display:block}
+.tot-blk{background:#1b1f2b;border:1px solid #2c3347;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.tot-chdr{background:#242838;padding:9px 14px;display:flex;justify-content:space-between;align-items:center}
+.tot-cn{font-size:15px;font-weight:900;color:#4fc3f7;letter-spacing:1px}
+.tot-ctot{font-size:11px;font-weight:700;background:#4fc3f7;color:#111;padding:2px 10px;border-radius:12px}
+.tot-row{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid #2c3347;font-size:13px}
+.tot-row:last-child{border-bottom:none}
+.tot-iname{color:#888}
+.tot-ival{font-weight:700}
+
+/* Mode tabs */
+.mtabs{display:flex;background:#0f1117;border-bottom:1px solid #2c3347}
+.mtab{flex:1;padding:10px;font-size:13px;font-weight:700;border:none;background:transparent;color:#555;cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
+.mtab.active{color:#f5a623;border-bottom-color:#f5a623}
+
+/* Bottom bar */
+.bbar{position:fixed;bottom:0;left:0;right:0;background:#1b1f2b;border-top:1px solid #2c3347;padding:10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:flex;gap:8px;z-index:60}
+.bbtn{flex:1;font-weight:700;font-size:14px;border:none;border-radius:10px;padding:13px;cursor:pointer}
+.bbtn:active{opacity:.85}
+.bbtn-pri{background:linear-gradient(135deg,#f5a623,#e8960f);color:#111}
+.bbtn-sec{background:#242838;color:#e8eaf0;border:1px solid #2c3347}
+
+/* Print modal */
+#printModal{display:none;position:fixed;inset:0;background:rgba(15,17,23,.95);z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 40px}
+.pm-inner{max-width:420px;margin:0 auto}
+.pm-title{font-size:22px;font-weight:900;letter-spacing:2px;color:#f5a623;margin-bottom:16px}
+.pm-section{background:#1b1f2b;border:1px solid #2c3347;border-radius:10px;padding:14px;margin-bottom:10px}
+.pm-label{font-size:10px;font-weight:700;letter-spacing:1px;color:#555;margin-bottom:10px}
+.pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pm-field label{font-size:10px;color:#555;font-weight:700;display:block;margin-bottom:3px}
+.pm-fname-row{display:flex;gap:6px;align-items:center}
+.pm-fname{flex:1}
+.btn-save-xl{background:#66bb6a;border:none;border-radius:8px;padding:9px 12px;color:#111;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap}
+.btn-save-xl:active{opacity:.85}
+.pm-info{font-size:11px;color:#555;margin-top:6px;line-height:1.5}
+.pm-sections{display:flex;flex-direction:column;gap:5px}
+.pm-sec-item{background:#0f1117;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600}
+.pm-sec-badge{font-size:10px;color:#555}
+.btn-gen{width:100%;background:linear-gradient(135deg,#f5a623,#e8960f);color:#111;font-weight:800;font-size:15px;border:none;border-radius:10px;padding:15px;cursor:pointer;margin-bottom:8px}
+.btn-close-pm{width:100%;background:#242838;color:#888;font-weight:700;font-size:14px;border:1px solid #2c3347;border-radius:10px;padding:13px;cursor:pointer}
+.btn-back-pm{background:#66bb6a;border:none;border-radius:8px;padding:7px 14px;color:#111;font-weight:700;font-size:12px;cursor:pointer}
+
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#66bb6a;color:#111;font-weight:700;font-size:13px;padding:10px 22px;border-radius:30px;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.loverlay{position:fixed;inset:0;background:rgba(15,17,23,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:999}
+.loverlay.show{display:flex}
+.spin{width:44px;height:44px;border:3px solid #2c3347;border-top-color:#f5a623;border-radius:50%;animation:sp .8s linear infinite;margin-bottom:12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="loverlay" id="loverlay"><div class="spin"></div><div style="color:#555;font-size:13px">Зареждане...</div></div>
+<div class="toast" id="toast"></div>
+
+<!-- UPLOAD -->
+<div id="upl">
+  <div class="logo">🥪 BANDITS</div>
+  <div class="logo-s">СИСТЕМА ЗА ЗАЯВКИ</div>
+  <div class="drop-card" id="drop">
+    <div class="drop-icon">📂</div>
+    <div class="drop-t">Качи предишна заявка</div>
+    <div class="drop-h">Excel файл (.xlsx)</div>
+    <input type="file" id="fileInp" accept=".xlsx,.xls">
+  </div>
+  <div class="or">или</div>
+  <button class="btn-new" onclick="newBlank()">➕ НОВА ЗАЯВКА</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-row1">
+      <div class="hdr-title">📋 ЗАЯВКА</div>
+      <div class="hdr-btns">
+        <button class="btn-hdr btn-back-hdr" onclick="goBack()">← Назад</button>
+        <button class="btn-hdr btn-print-hdr" onclick="openPrintModal()">🖨️ Печат</button>
+      </div>
+    </div>
+    <div class="date-row">
+      <input class="di" id="dProdDate" placeholder="Дата произв." oninput="updateSubject();autoSave()">
+      <select class="di-sel di" id="dProdDay" onchange="updateSubject();autoSave()">
+        <option value="">Ден произв.</option>
+        <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
+        <option>Четвъртък</option><option>Петък</option><option>Събота</option>
+      </select>
+      <input class="di" id="dDelDate" placeholder="Дата доставка" oninput="updateSubject();autoSave()">
+      <select class="di-sel di" id="dDelDay" onchange="updateSubject();autoSave()">
+        <option value="">Ден доставка</option>
+        <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
+        <option>Четвъртък</option><option>Петък</option><option>Събота</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="mtabs">
+    <button class="mtab active" id="tabObj" onclick="switchMode('obj')">📦 ПО ОБЕКТИ</button>
+    <button class="mtab" id="tabTot" onclick="switchMode('tot')">📊 ОБЩО</button>
+  </div>
+
+  <!-- Object view -->
+  <div id="objView">
+    <div class="dtabs" id="dtabs"></div>
+    <div id="objList"></div>
+  </div>
+
+  <!-- Edit single object -->
+  <div id="editView">
+    <div class="edit-hdr">
+      <button class="btn-back-obj" onclick="backToList()">← Обекти</button>
+      <span class="edit-obj-name" id="editObjName"></span>
+      <span class="edit-obj-tot" id="editObjTot"></span>
+    </div>
+    <div class="edit-body" id="editBody"></div>
+  </div>
+
+  <!-- Totals view -->
+  <div id="totView"></div>
+
+  <div class="bbar">
+    <button class="bbtn bbtn-sec" onclick="switchMode('tot')">📊 ОБЩО</button>
+    <button class="bbtn bbtn-pri" onclick="openPrintModal()">🖨️ ПЕЧАТ & ЗАПАЗИ</button>
+  </div>
+</div>
+
+<!-- PRINT MODAL -->
+<div id="printModal">
+  <div class="pm-inner">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="pm-title">🖨️ ПЕЧАТ & ЗАПАЗИ</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-back-pm" onclick="closePrintModal()">← ОБЕКТИ</button>
+        <button onclick="closePrintModal()" style="background:#2c3347;border:1px solid #3a4460;border-radius:8px;padding:7px 12px;color:#888;font-weight:700;font-size:12px;cursor:pointer">✕</button>
+      </div>
+    </div>
+
+    <!-- Dates -->
+    <div class="pm-section">
+      <div class="pm-label">📅 ДАТИ</div>
+      <div class="pm-grid">
+        <div class="pm-field">
+          <label>ДАТА ПРОИЗВОДСТВО</label>
+          <input class="di pm-fname" id="pProdDate" placeholder="19.05.2026" oninput="updateFileName()">
+        </div>
+        <div class="pm-field">
+          <label>ДЕН ПРОИЗВОДСТВО</label>
+          <select class="di-sel di" id="pProdDay" onchange="updateFileName()">
+            <option value="">— избери —</option>
+            <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
+            <option>Четвъртък</option><option>Петък</option><option>Събота</option>
+          </select>
+        </div>
+        <div class="pm-field">
+          <label>ДАТА ДОСТАВКА</label>
+          <input class="di pm-fname" id="pDelDate" placeholder="20.05.2026" oninput="updateFileName()">
+        </div>
+        <div class="pm-field">
+          <label>ДЕН ДОСТАВКА</label>
+          <select class="di-sel di" id="pDelDay" onchange="updateFileName()">
+            <option value="">— избери —</option>
+            <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
+            <option>Четвъртък</option><option>Петък</option><option>Събота</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- File name -->
+    <div class="pm-section" style="border-color:#f5a623">
+      <div class="pm-label" style="color:#f5a623">📁 ИМЕ НА ФАЙЛА (следващата заявка)</div>
+      <div class="pm-fname-row">
+        <input class="di pm-fname" id="pFileName" placeholder="Заявка_20.05_Вторник.xlsx" style="font-family:monospace;font-size:12px">
+        <button class="btn-save-xl" onclick="generateAndSave()">💾 ЗАПАЗИ EXCEL</button>
+      </div>
+      <div class="pm-info">✏️ Промени името ако трябва. Запази файла — следващия път го качи в приложението.</div>
+    </div>
+
+    <!-- Sections -->
+    <div class="pm-section">
+      <div class="pm-label">📄 СЪДЪРЖАНИЕ (× 2 копия при печат)</div>
+      <div class="pm-sections" id="pmSections"></div>
+    </div>
+
+    <button class="btn-gen" onclick="generateAndSave()">💾 ГЕНЕРИРАЙ & ЗАПАЗИ EXCEL</button>
+    
+    <!-- Mail info -->
+    <div class="pm-section">
+      <div class="pm-label">📧 ИЗПРАТИ ПО МЕЙЛ</div>
+      <div style="font-size:12px;color:#e8eaf0;line-height:1.8;margin-bottom:10px">
+        Генерира Excel и отваря Mail апликацията с прикачения файл.
+      </div>
+      <button onclick="sendByEmail()" style="width:100%;background:#EA4335;border:none;border-radius:10px;padding:13px;color:#fff;font-family:-apple-system,sans-serif;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">
+        📧 ИЗПРАТИ НА МЕЙЛ
+      </button>
+      <div style="background:#0f1117;border-radius:8px;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:700;color:#4fc3f7;word-break:break-all">sandwich.bandits.bg@gmail.com</span>
+        <button onclick="copyEmail()" style="background:#4fc3f7;border:none;border-radius:6px;padding:5px 10px;color:#111;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">📋</button>
+      </div>
+    </div>
+
+    <button class="btn-close-pm" onclick="closePrintModal()">ЗАТВОРИ</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let WB = {};
+let sheets = [];
+let curDistrict = '';
+let curObj = '';
+let curMode = 'obj';
+let saveTimer = null;
+
+// ===== AUTO-SAVE =====
+function autoSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try {
+      const data = {WB, sheets, dates:{
+        prodDate: document.getElementById('dProdDate')?.value || '',
+        prodDay: document.getElementById('dProdDay')?.value || '',
+        delDate: document.getElementById('dDelDate')?.value || '',
+        delDay: document.getElementById('dDelDay')?.value || ''
+      }};
+      localStorage.setItem('bandits_zayavka', JSON.stringify(data));
+      // Show small indicator
+      showAutoSaveBadge();
+    } catch(e) { console.error('Save failed', e); }
+  }, 500);
+}
+
+function showAutoSaveBadge() {
+  let b = document.getElementById('autoSaveBadge');
+  if(!b) {
+    b = document.createElement('div');
+    b.id = 'autoSaveBadge';
+    b.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#66bb6a;color:#111;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none';
+    document.body.appendChild(b);
+  }
+  b.textContent = '💾 Запазено';
+  b.style.opacity = '1';
+  clearTimeout(b._timeout);
+  b._timeout = setTimeout(()=>b.style.opacity='0', 1500);
+}
+
+function loadSaved() {
+  try {
+    const saved = localStorage.getItem('bandits_zayavka');
+    if(!saved) return false;
+    const data = JSON.parse(saved);
+    if(data.WB && data.sheets && data.sheets.length) {
+      WB = data.WB;
+      sheets = data.sheets;
+      // Restore dates after app shown
+      setTimeout(()=>{
+        if(data.dates) {
+          ['ProdDate','ProdDay','DelDate','DelDay'].forEach(k=>{
+            const el = document.getElementById('d'+k);
+            if(el && data.dates[k.charAt(0).toLowerCase()+k.slice(1)]) {
+              el.value = data.dates[k.charAt(0).toLowerCase()+k.slice(1)];
+            }
+          });
+        }
+      }, 100);
+      return true;
+    }
+  } catch(e) { console.error('Load failed', e); }
+  return false;
+}
+
+// ===== UPLOAD =====
+document.getElementById('fileInp').addEventListener('change', e => {
+  if(e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  loading(true);
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      parseWB(wb);
+      // Pre-fill filename from loaded file
+      const n = file.name.replace(/\.xlsx?$/i,'');
+      document.getElementById('pFileName').value = file.name;
+      showApp();
+    } catch(err) {
+      alert('Грешка при четене: ' + err.message);
+    }
+    loading(false);
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function parseWB(wb) {
+  WB = {}; sheets = [];
+  wb.SheetNames.forEach(sn => {
+    if(sn === 'Sheet1' || sn === 'Общо') return;
+    const ws = wb.Sheets[sn];
+    const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+    const parsed = parseSheet(raw);
+    if(parsed && parsed.objects.length) { WB[sn] = parsed; sheets.push(sn); }
+  });
+}
+
+const SALAD_ITEMS = ['Свеж микс','Пилешка','Фусили','Овчарска','Риба тон'];
+const KNOWN_CATS = ['Салати','Тортила','Трамезини','Чабата','Десерти','Крейзи'];
+
+function parseSheet(rows) {
+  if(!rows || rows.length < 3) return null;
+  let hdr = 1;
+  for(let i=0;i<4;i++) {
+    if(rows[i] && rows[i].filter(c=>c&&typeof c==='string'&&c.length>1).length>1){hdr=i;break;}
+  }
+  const objects=[], objCols={};
+  (rows[hdr]||[]).forEach((c,i)=>{
+    if(i>=3&&c&&String(c).trim()){const n=String(c).trim();objects.push(n);objCols[n]=i;}
+  });
+  if(!objects.length) return null;
+  
+  const categories=[]; let cat=null;
+  
+  // Check if header row has a category in col 0 (like "Салати" together with "СИТИ")
+  const hdrRow = rows[hdr] || [];
+  const hdrC0 = hdrRow[0] ? String(hdrRow[0]).trim() : '';
+  if(hdrC0 && KNOWN_CATS.includes(hdrC0)) {
+    cat = {name: hdrC0, items: []};
+    categories.push(cat);
+  }
+  
+  for(let r=hdr+1; r<rows.length; r++) {
+    const row = rows[r] || [];
+    const c0 = row[0] ? String(row[0]).trim() : '';
+    const c1 = row[1] ? String(row[1]).trim() : '';
+    
+    // Known category header (col0 has cat name, col1 is empty)
+    if(c0 && KNOWN_CATS.includes(c0)) {
+      cat = {name: c0, items: []};
+      categories.push(cat);
+      continue;
+    }
+    
+    // Other category header (any text in col0, empty col1)
+    if(c0 && !['None','0','ОБЩО'].includes(c0) && !c1) {
+      cat = {name: c0, items: []};
+      categories.push(cat);
+      continue;
+    }
+    
+    // Item row
+    if(c1 && !['None','0','ОБЩО'].includes(c1)) {
+      // Skip district name rows like "СИТИ", "СТАР", "300", "Други"
+      if(/^[А-ЯA-Z0-9]{2,}$/.test(c1) && !cat) continue;
+      
+      // Auto-detect Салати if no cat yet and item matches
+      if(!cat && SALAD_ITEMS.includes(c1)) {
+        cat = {name: 'Салати', items: []};
+        categories.push(cat);
+      }
+      
+      if(cat) {
+        const qtys = {};
+        objects.forEach(obj => {
+          const ci = objCols[obj];
+          const v = ci < row.length ? row[ci] : null;
+          qtys[obj] = (typeof v === 'number') ? v : (v ? parseInt(v)||0 : 0);
+        });
+        cat.items.push({name: c1.trim(), qtys, origQtys: {...qtys}});
+      }
+    }
+  }
+  return {objects, categories};
+}
+
+function newBlank() {
+  WB = {};
+  sheets = [];
+  toast('Качи Excel файл за да започнеш');
+}
+
+// ===== APP =====
+function showApp() {
+  document.getElementById('upl').style.display='none';
+  const app = document.getElementById('app');
+  app.classList.add('show');
+  curDistrict = sheets[0] || '';
+  renderTabs();
+  renderObjList();
+  autoSave();
+}
+
+// On page load - показваме архива (start screen)
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(()=>{
+    renderStartScreen();
+  }, 100);
+});
+
+// ===== START SCREEN (Архив + Нова) =====
+function renderStartScreen() {
+  const archive = loadArchive();
+  const hasDraft = hasUnfinishedDraft();
+  
+  // Override flex layout
+  const upl = document.getElementById('upl');
+  upl.style.cssText = 'display:block;min-height:100vh;padding:20px 0;background:radial-gradient(ellipse at 50% 0%,#1a2a3a,#0f1117 65%);overflow-y:auto';
+  
+  let html = `
+    <div style="max-width:520px;margin:0 auto;padding:14px">
+      <div style="text-align:center;margin-bottom:20px;padding:20px 0">
+        <div style="font-size:32px;font-weight:900;color:#f5a623;letter-spacing:1px">🥪 BANDITS</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:4px;text-transform:uppercase;letter-spacing:1px">Заявки за обекти</div>
+      </div>
+  `;
+  
+  // Continue draft (ако има)
+  if(hasDraft) {
+    html += `
+      <div onclick="resumeDraft()" style="background:linear-gradient(135deg,#3a2d0d,#2a2208);border:1px solid #f5a623;border-radius:14px;padding:16px;margin-bottom:14px;cursor:pointer">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:28px">📝</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:900;color:#f5a623">Незавършена заявка</div>
+            <div style="font-size:11px;color:#a0825a;margin-top:2px">Имаш чернова от работа — натисни за продължение</div>
+          </div>
+          <div style="color:#f5a623;font-size:20px">›</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Бутон "Нова заявка"
+  html += `
+    <div onclick="startNewOrder()" style="background:linear-gradient(135deg,#f5a623,#e8960f);border-radius:14px;padding:18px;margin-bottom:18px;cursor:pointer;box-shadow:0 4px 12px rgba(245,166,35,0.3)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:32px">➕</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:900;color:#111">НОВА ЗАЯВКА</div>
+          <div style="font-size:11px;color:#5c3c00;margin-top:2px">Качи Excel файл за нова заявка</div>
+        </div>
+        <div style="color:#111;font-size:22px">›</div>
+      </div>
+    </div>
+  `;
+  
+  // Списък с архивни заявки
+  if(archive.length) {
+    html += `<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin:18px 0 10px 4px">📂 ЗАПИСАНИ ЗАЯВКИ (${archive.length})</div>`;
+    
+    archive.forEach((item, idx) => {
+      const savedAt = new Date(item.savedAt);
+      const dateStr = savedAt.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit', year:'numeric'});
+      const timeStr = savedAt.toLocaleTimeString('bg-BG', {hour:'2-digit', minute:'2-digit'});
+      
+      const prodInfo = item.dates && item.dates.prodDate ? `📦 ${item.dates.prodDate} ${item.dates.prodDay||''}` : '';
+      const delInfo = item.dates && item.dates.delDate ? `🚚 ${item.dates.delDate} ${item.dates.delDay||''}` : '';
+      const dates = [prodInfo, delInfo].filter(x=>x).join(' · ');
+      
+      html += `
+        <div style="background:#1b1f2b;border:1px solid #2c3347;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+          <div onclick="openArchive(${idx})" style="flex:1;cursor:pointer;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name || 'Без име'}</div>
+            ${dates ? `<div style="font-size:11px;color:#4fc3f7;margin-top:3px">${dates}</div>` : ''}
+            <div style="font-size:10px;color:#6b7280;margin-top:3px">💾 Записана: ${dateStr} ${timeStr}</div>
+          </div>
+          <button onclick="deleteArchive(${idx}); event.stopPropagation();" style="background:#3a1d1d;color:#ef5350;border:none;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer">🗑️</button>
+        </div>
+      `;
+    });
+    
+    html += `
+      <div onclick="clearAllArchive()" style="text-align:center;margin-top:14px;padding:10px;font-size:11px;color:#6b7280;cursor:pointer">
+        Изтрий всички записани заявки
+      </div>
+    `;
+  } else {
+    html += `
+      <div style="text-align:center;padding:30px 16px;color:#6b7280;font-size:12px;background:#1b1f2b;border-radius:12px;border:1px solid #2c3347;margin-top:14px">
+        📂 Нямаш записани заявки още<br>
+        <span style="font-size:11px;color:#4a5160">След като създадеш Excel файл, заявката се записва тук автоматично</span>
+      </div>
+    `;
+  }
+  
+  html += '</div>';
+  
+  upl.innerHTML = html;
+  document.getElementById('app').classList.remove('show');
+}
+
+function startNewOrder() {
+  // Връщаме се към оригиналното flex layout
+  const upl = document.getElementById('upl');
+  upl.style.cssText = '';  // изчиства inline, връща CSS дефолта (flex column center)
+  upl.innerHTML = `
+    <div class="logo">🥪 BANDITS</div>
+    <div class="logo-s">НОВА ЗАЯВКА</div>
+    <div class="drop-card" id="drop">
+      <div class="drop-icon">📂</div>
+      <div class="drop-t">Качи Excel заявка</div>
+      <div class="drop-h">от предишна заявка (.xlsx)</div>
+      <input type="file" id="fileInp" accept=".xlsx,.xls">
+    </div>
+    <button onclick="renderStartScreen()" style="margin-top:20px;background:#242838;border:1px solid #2c3347;border-radius:10px;padding:12px 28px;color:#e8eaf0;font-family:-apple-system,sans-serif;font-weight:700;font-size:13px;cursor:pointer">← Назад към началния екран</button>
+  `;
+  
+  // Re-attach handler
+  document.getElementById('fileInp').addEventListener('change', e => {
+    if(e.target.files[0]) loadFile(e.target.files[0]);
+  });
+}
+
+function resumeDraft() {
+  if(loadSaved()) {
+    showApp();
+  } else {
+    toast('Няма чернова');
+    renderStartScreen();
+  }
+}
+
+function hasUnfinishedDraft() {
+  try {
+    const saved = localStorage.getItem('bandits_zayavka');
+    if(!saved) return false;
+    const data = JSON.parse(saved);
+    return data.WB && data.sheets && data.sheets.length;
+  } catch(e) { return false; }
+}
+
+// ===== АРХИВ ФУНКЦИИ =====
+function loadArchive() {
+  try {
+    const a = localStorage.getItem('bandits_archive');
+    return a ? JSON.parse(a) : [];
+  } catch(e) { return []; }
+}
+
+function saveToArchive(name) {
+  try {
+    const archive = loadArchive();
+    const item = {
+      name: name || 'Заявка',
+      WB: WB,
+      sheets: sheets,
+      dates: {
+        prodDate: document.getElementById('pProdDate')?.value || document.getElementById('dProdDate')?.value || '',
+        prodDay: document.getElementById('pProdDay')?.value || document.getElementById('dProdDay')?.value || '',
+        delDate: document.getElementById('pDelDate')?.value || document.getElementById('dDelDate')?.value || '',
+        delDay: document.getElementById('pDelDay')?.value || document.getElementById('dDelDay')?.value || ''
+      },
+      savedAt: new Date().toISOString()
+    };
+    // Нови най-горе
+    archive.unshift(item);
+    // Лимит до 50 записани заявки (за да не препълни localStorage)
+    if(archive.length > 50) archive.splice(50);
+    localStorage.setItem('bandits_archive', JSON.stringify(archive));
+    return true;
+  } catch(e) {
+    console.error('Архивирането не успя:', e);
+    return false;
+  }
+}
+
+function openArchive(idx) {
+  const archive = loadArchive();
+  if(!archive[idx]) return;
+  const item = archive[idx];
+  
+  WB = item.WB;
+  sheets = item.sheets;
+  
+  // Възстанови auto-save (тази вече е активна работна сесия)
+  autoSave();
+  
+  showApp();
+  
+  // Възстанови датите след render
+  setTimeout(()=>{
+    if(item.dates) {
+      ['dProdDate','dProdDay','dDelDate','dDelDay'].forEach(id => {
+        const el = document.getElementById(id);
+        const key = id.charAt(1).toLowerCase() + id.slice(2);
+        if(el && item.dates[key]) el.value = item.dates[key];
+      });
+    }
+  }, 100);
+}
+
+function deleteArchive(idx) {
+  const archive = loadArchive();
+  if(!archive[idx]) return;
+  if(!confirm(`Изтрий "${archive[idx].name || 'тази заявка'}"?`)) return;
+  archive.splice(idx, 1);
+  localStorage.setItem('bandits_archive', JSON.stringify(archive));
+  renderStartScreen();
+}
+
+function clearAllArchive() {
+  if(!confirm('Изтрий ВСИЧКИ записани заявки? Това не може да се върне.')) return;
+  if(!confirm('Сигурен ли си? Всички архивни заявки ще изчезнат.')) return;
+  localStorage.removeItem('bandits_archive');
+  renderStartScreen();
+}
+
+function goBack() {
+  if(confirm('Връщане към началния екран? Текущата заявка си остава като чернова.')) {
+    document.getElementById('app').classList.remove('show');
+    renderStartScreen();
+  }
+}
+
+// ===== MODE =====
+function switchMode(mode) {
+  curMode = mode;
+  document.getElementById('tabObj').classList.toggle('active',mode==='obj');
+  document.getElementById('tabTot').classList.toggle('active',mode==='tot');
+  const ov = document.getElementById('objView');
+  const ev = document.getElementById('editView');
+  const tv = document.getElementById('totView');
+  if(mode==='obj'){
+    ov.style.display='block';ev.style.display='none';tv.classList.remove('show');
+    renderObjList();
+  } else {
+    ov.style.display='none';ev.style.display='none';tv.classList.add('show');
+    renderTotals();
+  }
+}
+
+// ===== TABS =====
+function renderTabs() {
+  document.getElementById('dtabs').innerHTML = sheets.map(s=>
+    `<button class="dtab ${s===curDistrict?'active':''}" onclick="selectDistrict('${s}')">${s}</button>`
+  ).join('');
+}
+
+function selectDistrict(s) {
+  curDistrict=s; renderTabs(); renderObjList();
+}
+
+// ===== OBJECT LIST =====
+function getObjTotal(dist,obj) {
+  const d=WB[dist]; if(!d) return 0;
+  return d.categories.reduce((s,cat)=>s+cat.items.reduce((ss,it)=>ss+(it.qtys[obj]||0),0),0);
+}
+
+function renderObjList() {
+  const d=WB[curDistrict];
+  if(!d){document.getElementById('objList').innerHTML='';return;}
+  document.getElementById('objList').innerHTML = d.objects.map(obj=>{
+    const tot=getObjTotal(curDistrict,obj);
+    return `<button class="obj-btn ${tot>0?'has-data':''}" onclick="openObj('${curDistrict.replace(/'/g,"\\'")}','${obj.replace(/'/g,"\\'")}')">
+      <span class="obj-name">${obj}</span>
+      <span class="obj-badge">${tot}</span>
+    </button>`;
+  }).join('');
+}
+
+// ===== EDIT OBJECT =====
+function openObj(dist,obj) {
+  curDistrict=dist; curObj=obj;
+  document.getElementById('objView').style.display='none';
+  const ev=document.getElementById('editView');
+  ev.classList.add('show');
+  document.getElementById('editObjName').textContent=obj;
+  renderEditObj();
+}
+
+function renderEditObj() {
+  const d=WB[curDistrict]; if(!d) return;
+  const tot=getObjTotal(curDistrict,curObj);
+  document.getElementById('editObjTot').textContent=`Σ ${tot}`;
+  let html='';
+  d.categories.forEach((cat,ci)=>{
+    const catTot=cat.items.reduce((s,it)=>s+(it.qtys[curObj]||0),0);
+    html+=`<div class="cat-blk">
+      <div class="cat-hdr">
+        <span class="cat-n">${cat.name}</span>
+        <span class="cat-tot" id="ct${ci}">${catTot}</span>
+      </div>`;
+    cat.items.forEach((item,ii)=>{
+      const q=item.qtys[curObj]||0;
+      const chg=q!==(item.origQtys[curObj]||0);
+      html+=`<div class="irow">
+        <span class="iname">${item.name}</span>
+        <div class="qwrap">
+          <button class="qbtn" onclick="chgQ(${ci},${ii},-1)">−</button>
+          <input id="inp_${ci}_${ii}" class="qinp${chg?' chg':''}" type="number" value="${q}" min="0"
+            onchange="setQ(${ci},${ii},this.value,this)"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+          <button class="qbtn" onclick="chgQ(${ci},${ii},1)">+</button>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  document.getElementById('editBody').innerHTML=html;
+}
+
+function chgQ(ci,ii,delta) {
+  const item=WB[curDistrict].categories[ci].items[ii];
+  item.qtys[curObj]=Math.max(0,(item.qtys[curObj]||0)+delta);
+  const inp=document.getElementById(`inp_${ci}_${ii}`);
+  if(inp){
+    inp.value=item.qtys[curObj];
+    const chg=item.qtys[curObj]!==(item.origQtys[curObj]||0);
+    inp.className='qinp'+(chg?' chg':'');
+  }
+  updateEditUI(ci);
+  autoSave();
+}
+
+function setQ(ci,ii,val,el) {
+  const item=WB[curDistrict].categories[ci].items[ii];
+  item.qtys[curObj]=Math.max(0,parseInt(val)||0);
+  const chg=item.qtys[curObj]!==(item.origQtys[curObj]||0);
+  el.className='qinp'+(chg?' chg':'');
+  updateEditUI(ci);
+  autoSave();
+}
+
+function updateEditUI(ci) {
+  const cat=WB[curDistrict].categories[ci];
+  const catTot=cat.items.reduce((s,it)=>s+(it.qtys[curObj]||0),0);
+  const ctEl=document.getElementById('ct'+ci);
+  if(ctEl) ctEl.textContent=catTot;
+  document.getElementById('editObjTot').textContent=`Σ ${getObjTotal(curDistrict,curObj)}`;
+}
+
+function backToList() {
+  document.getElementById('editView').classList.remove('show');
+  document.getElementById('objView').style.display='block';
+  renderObjList();
+}
+
+// ===== TOTALS =====
+function calcTotals() {
+  const totals={};
+  sheets.forEach(sn=>{
+    const d=WB[sn]; if(!d) return;
+    d.categories.forEach(cat=>{
+      if(!totals[cat.name]) totals[cat.name]={};
+      cat.items.forEach(item=>{
+        if(!totals[cat.name][item.name]) totals[cat.name][item.name]=0;
+        Object.values(item.qtys).forEach(q=>totals[cat.name][item.name]+=(q||0));
+      });
+    });
+  });
+  return totals;
+}
+
+function renderTotals() {
+  const totals=calcTotals();
+  let html='';
+  Object.entries(totals).forEach(([cat,items])=>{
+    const catTot=Object.values(items).reduce((s,v)=>s+v,0);
+    html+=`<div class="tot-blk">
+      <div class="tot-chdr"><span class="tot-cn">${cat}</span><span class="tot-ctot">${catTot}</span></div>`;
+    Object.entries(items).forEach(([n,v])=>{
+      html+=`<div class="tot-row"><span class="tot-iname">${n}</span><span class="tot-ival">${v||'—'}</span></div>`;
+    });
+    html+='</div>';
+  });
+  document.getElementById('totView').innerHTML=html||'<div style="padding:40px;text-align:center;color:#555">Няма данни</div>';
+}
+
+// ===== PRINT MODAL =====
+function openPrintModal() {
+  // Sync dates from header to modal
+  ['ProdDate','ProdDay','DelDate','DelDay'].forEach(k=>{
+    const src=document.getElementById('d'+k);
+    const dst=document.getElementById('p'+k);
+    if(src&&dst&&!dst.value) dst.value=src.value;
+  });
+  updateFileName();
+  
+  // Sections list
+  document.getElementById('pmSections').innerHTML=[...sheets,'Обща заявка'].map(s=>
+    `<div class="pm-sec-item"><span>✓ ${s}</span><span class="pm-sec-badge">× 2 копия</span></div>`
+  ).join('');
+  
+  document.getElementById('printModal').style.display='block';
+  closePrintModalEdit();
+}
+
+function closePrintModalEdit() {
+  // Don't close, just for back button
+}
+
+function closePrintModal() {
+  document.getElementById('printModal').style.display='none';
+}
+
+function updateFileName() {
+  const dd=document.getElementById('pDelDate').value||'';
+  const dy=document.getElementById('pDelDay').value||'доставка';
+  const fname=`Заявка_${dd.replace(/\./g,'_')}_${dy}.xlsx`;
+  const el=document.getElementById('pFileName');
+  if(!el.dataset.manual) el.value=fname;
+}
+
+document.getElementById('pFileName').addEventListener('input',function(){
+  this.dataset.manual='1';
+});
+
+function updateSubject() {
+  // Sync header dates to modal if modal dates empty
+}
+
+// ===== GENERATE EXCEL (ExcelJS - with formatting, print setup, bold) =====
+async function generateAndSave() {
+  const prodDate=document.getElementById('pProdDate').value||'';
+  const prodDay=document.getElementById('pProdDay').value||'';
+  const delDate=document.getElementById('pDelDate').value||'';
+  const delDay=document.getElementById('pDelDay').value||'';
+  const fname=document.getElementById('pFileName').value||'Заявка.xlsx';
+  const finalName=fname.endsWith('.xlsx')?fname:fname+'.xlsx';
+  
+  try {
+    const wb = await buildFormattedWorkbook(prodDate, prodDay, delDate, delDay);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    
+    // ⭐ Запис в архива при успешно генериране на Excel
+    saveToArchive(finalName.replace(/\.xlsx$/i,''));
+    
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if(isMobile) {
+      // На iPhone: ползваме Web Share API ако е достъпно
+      if(navigator.canShare) {
+        const file = new File([blob], finalName, {type:blob.type});
+        if(navigator.canShare({files:[file]})) {
+          await navigator.share({files:[file], title:finalName});
+          toast('✅ Изпратено!');
+          return;
+        }
+      }
+      // Fallback: data URL
+      const reader = new FileReader();
+      reader.onload = function(){
+        const a = document.createElement('a');
+        a.href = reader.result;
+        a.download = finalName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast('✅ Отваря се в Excel...');
+      };
+      reader.readAsDataURL(blob);
+    } else {
+      // Desktop: FileSaver
+      saveAs(blob, finalName);
+      toast(`✅ ${finalName} запазен!`);
+    }
+  } catch(e) {
+    console.error(e);
+    toast('❌ Грешка: ' + e.message);
+  }
+}
+
+// ===== HELPER: Build formatted workbook with ExcelJS =====
+async function buildFormattedWorkbook(prodDate, prodDay, delDate, delDay) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sandwich Bandits';
+  wb.created = new Date();
+  const totals = calcTotals();
+  
+  // ========== ОБЩА ЗАЯВКА ==========
+  const wsG = wb.addWorksheet('Обща заявка', {
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {left:0.5, right:0.5, top:0.5, bottom:0.5, header:0.3, footer:0.3}
+    }
+  });
+  
+  // Title row
+  wsG.addRow(['SANDWICH BANDITS — ОБЩА ЗАЯВКА']);
+  wsG.mergeCells('A1:C1');
+  wsG.getCell('A1').font = {bold:true, size:14, color:{argb:'FFFFFFFF'}};
+  wsG.getCell('A1').fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'}};
+  wsG.getCell('A1').alignment = {horizontal:'center', vertical:'middle'};
+  wsG.getRow(1).height = 24;
+  
+  // Date row
+  wsG.addRow([`Производство: ${prodDate} ${prodDay}`,`Доставка: ${delDate} ${delDay}`]);
+  wsG.mergeCells('A2:B2');
+  wsG.mergeCells('C2:C2');
+  wsG.getCell('A2').font = {bold:true, size:10};
+  wsG.getCell('A2').alignment = {horizontal:'left'};
+  wsG.addRow([]);
+  
+  // Header row
+  const hRow = wsG.addRow(['Категория','Артикул','ОБЩО']);
+  hRow.eachCell(cell => {
+    cell.font = {bold:true, size:11, color:{argb:'FFFFFFFF'}};
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF2C3347'}};
+    cell.alignment = {horizontal:'center', vertical:'middle'};
+    cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+  });
+  wsG.getRow(4).height = 22;
+  
+  // Data
+  Object.entries(totals).forEach(([cat, items]) => {
+    const catTotal = Object.values(items).reduce((s,v)=>s+(Number(v)||0), 0);
+    const catRow = wsG.addRow([cat, '', catTotal > 0 ? catTotal : '']);
+    catRow.eachCell(cell => {
+      cell.font = {bold:true, size:11};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF0F0F0'}};
+      cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+    });
+    Object.entries(items).forEach(([name, v]) => {
+      const n = Number(v) || 0;
+      const r = wsG.addRow(['', name, n > 0 ? n : '']);
+      r.eachCell(cell => {
+        cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+        cell.alignment = {vertical:'middle'};
+      });
+      r.getCell(3).alignment = {horizontal:'center', vertical:'middle'};
+      r.getCell(3).font = {bold:true};
+    });
+    wsG.addRow([]);
+  });
+  
+  wsG.columns = [
+    {width:20},
+    {width:24},
+    {width:10}
+  ];
+  
+  // ========== DISTRICT SHEETS ==========
+  // Всеки район с > 13 обекта се разделя автоматично за по-добра четимост
+  const MAX_OBJS_PER_SHEET = 13;
+  const PART_LETTERS = ['А','Б','В','Г','Д','Е','Ж'];
+  
+  for(const sn of sheets) {
+    const d = WB[sn];
+    if(!d || !d.objects.length) continue;
+    
+    if(d.objects.length > MAX_OBJS_PER_SHEET) {
+      const parts = Math.ceil(d.objects.length / MAX_OBJS_PER_SHEET);
+      const perPart = Math.ceil(d.objects.length / parts);
+      for(let i = 0; i < parts; i++) {
+        const partObjs = d.objects.slice(i * perPart, (i + 1) * perPart);
+        const partName = `${sn}-${PART_LETTERS[i]}`;
+        addDistrictSheet(wb, partName, d, partObjs, prodDate, prodDay, delDate, delDay);
+      }
+    } else {
+      addDistrictSheet(wb, sn, d, d.objects, prodDate, prodDay, delDate, delDay);
+    }
+  }
+  
+  return wb;
+}
+
+// ===== HELPER: Add a district sheet (with print formatting) =====
+function addDistrictSheet(wb, sheetName, d, objs, prodDate, prodDay, delDate, delDay) {
+  // Landscape за >5 обекта, portrait за по-малки
+  const isLandscape = objs.length > 5;
+  
+  const ws = wb.addWorksheet(sheetName, {
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: isLandscape ? 'landscape' : 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: isLandscape ? {
+        left: 0.25, right: 0.25, top: 0.35, bottom: 0.35,
+        header: 0.15, footer: 0.15
+      } : {
+        left: 0.4, right: 0.4, top: 0.4, bottom: 0.4,
+        header: 0.2, footer: 0.2
+      },
+      horizontalCentered: true,
+      printTitlesRow: '4:4'  // Repeat header row on each page
+    },
+    views: [{showGridLines: false}]
+  });
+  
+  // ── Title row ──
+  const totalCols = 3 + objs.length;
+  ws.addRow([`SANDWICH BANDITS — ${sheetName.toUpperCase()}`]);
+  ws.mergeCells(1, 1, 1, totalCols);
+  ws.getCell('A1').font = {bold:true, size:14, color:{argb:'FFFFFFFF'}};
+  ws.getCell('A1').fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'}};
+  ws.getCell('A1').alignment = {horizontal:'center', vertical:'middle'};
+  ws.getRow(1).height = 26;
+  
+  // ── Date row ──
+  ws.addRow([`Производство: ${prodDate} ${prodDay}`,`Доставка: ${delDate} ${delDay}`]);
+  ws.mergeCells(2, 1, 2, 2);
+  ws.mergeCells(2, 3, 2, totalCols);
+  ws.getCell('A2').font = {bold:true, size:10};
+  ws.getCell('A2').alignment = {horizontal:'left'};
+  ws.getRow(2).height = 18;
+  
+  ws.addRow([]);
+  
+  // ── Header row (Категория, Артикул, ОБЩО, обект1, обект2, ...) ──
+  const headerCells = ['Категория','Артикул','ОБЩО', ...objs];
+  const hRow = ws.addRow(headerCells);
+  // С разделянето всеки лист има <= 13 обекта - можем да си позволим вертикално завъртяни но 4-голям шрифт
+  hRow.eachCell((cell, col) => {
+    if(col <= 3) {
+      // Категория / Артикул / ОБЩО
+      cell.font = {bold:true, size:11, color:{argb:'FFFFFFFF'}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF2C3347'}};
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+    } else {
+      // ИМЕНА НА ОБЕКТИ - удебелени, по-голям шрифт, ротирани вертикално
+      cell.font = {bold:true, size:12, color:{argb:'FFFFFFFF'}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'}};
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        textRotation: 90,  // винаги вертикално - имената са дълги
+        wrapText: false
+      };
+    }
+    cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+  });
+  // По-висок ред за вертикалните имена на обекти
+  hRow.height = 110;
+  
+  // ── Data rows ──
+  // Помощна функция: 0/null/undefined/false → ''
+  const noZero = v => (v && Number(v) > 0) ? Number(v) : '';
+  
+  d.categories.forEach(cat => {
+    // Category row
+    const catTotal = cat.items.reduce((s,it) => s + Object.values(it.qtys).reduce((a,b) => a+(Number(b)||0), 0), 0);
+    const catObjTotals = objs.map(obj => {
+      const t = cat.items.reduce((s,it) => s + (Number(it.qtys[obj])||0), 0);
+      return noZero(t);
+    });
+    const catRow = ws.addRow([cat.name, '', noZero(catTotal), ...catObjTotals]);
+    catRow.eachCell((cell, col) => {
+      cell.font = {bold:true, size:10};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFE8EEF7'}};
+      cell.alignment = {horizontal: col === 1 ? 'left' : 'center', vertical:'middle'};
+      cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+    });
+    
+    // Item rows
+    cat.items.forEach(item => {
+      const itemTot = Object.values(item.qtys).reduce((s,v) => s+(Number(v)||0), 0);
+      const objVals = objs.map(obj => noZero(item.qtys[obj]));
+      const r = ws.addRow(['', item.name, noZero(itemTot), ...objVals]);
+      r.eachCell((cell, col) => {
+        cell.font = {size:10};
+        cell.border = {top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+        if(col === 2) {
+          cell.alignment = {horizontal:'left', vertical:'middle'};
+        } else if(col === 3) {
+          cell.alignment = {horizontal:'center', vertical:'middle'};
+          cell.font = {size:11, bold:true};
+        } else if(col > 3) {
+          cell.alignment = {horizontal:'center', vertical:'middle'};
+          cell.font = {size:11, bold:true};  // удебелени бройките за по-добра видимост
+        }
+      });
+    });
+    // Empty separator row
+    ws.addRow([]);
+  });
+  
+  // ── Column widths ──
+  const cols = [
+    {width: 13},  // Категория
+    {width: 17},  // Артикул
+    {width: 7}    // ОБЩО
+  ];
+  // Колоните на обектите: вече <= 13 обекта/лист → можем да си позволим по-широки колони
+  objs.forEach(obj => {
+    if(objs.length > 10) {
+      cols.push({width: 5.5});
+    } else if(objs.length > 6) {
+      cols.push({width: 6.5});
+    } else {
+      cols.push({width: 9});
+    }
+  });
+  ws.columns = cols;
+}
+
+async function sendByEmail() {
+  const prodDate=document.getElementById('pProdDate').value||'';
+  const prodDay=document.getElementById('pProdDay').value||'';
+  const delDate=document.getElementById('pDelDate').value||'';
+  const delDay=document.getElementById('pDelDay').value||'';
+  const fname=document.getElementById('pFileName').value||'Заявка.xlsx';
+  const finalName=fname.endsWith('.xlsx')?fname:fname+'.xlsx';
+
+  try {
+    const wb = await buildFormattedWorkbook(prodDate, prodDay, delDate, delDay);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const file = new File([blob], finalName, {type:blob.type});
+    
+    // ⭐ Запис в архива при успешно генериране на Excel
+    saveToArchive(finalName.replace(/\.xlsx$/i,''));
+    
+    const subj=encodeURIComponent(`Заявка доставка ${delDate} ${delDay} | Производство ${prodDate} ${prodDay}`);
+    const body=encodeURIComponent(`Здравейте,\n\nПрикачена е заявката за печат.\n\nПроизводство: ${prodDate} ${prodDay}\nДоставка: ${delDate} ${delDay}\n\nSandwich Bandits`);
+    const to='sandwich.bandits.bg@gmail.com';
+
+    // Use Web Share API if available (iOS Safari supports this)
+    if(navigator.canShare && navigator.canShare({files:[file]})) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Заявка ${delDate} ${delDay}`,
+          text: `Производство: ${prodDate} ${prodDay} | Доставка: ${delDate} ${delDay}`
+        });
+        toast('✅ Споделено!');
+      } catch(e) {
+        if(e.name !== 'AbortError') fallbackEmail(to, subj, body);
+      }
+    } else {
+      fallbackEmail(to, subj, body);
+    }
+  } catch(e) {
+    console.error(e);
+    toast('❌ Грешка: ' + e.message);
+  }
+}
+
+function fallbackEmail(to, subj, body) {
+  window.location.href = `mailto:${to}?subject=${subj}&body=${body}`;
+  toast('📧 Отваря Mail — прикачи файла ръчно');
+}
+
+function copyEmail() {
+  const email='sandwich.bandits.bg@gmail.com';
+  navigator.clipboard.writeText(email)
+    .then(()=>toast('✅ Мейлът е копиран!'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');
+      ta.value=email;ta.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(ta);ta.select();
+      document.execCommand('copy');document.body.removeChild(ta);
+      toast('✅ Мейлът е копиран!');
+    });
+}
+
+function loading(s){document.getElementById('loverlay').classList.toggle('show',s);}
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+<script>
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
