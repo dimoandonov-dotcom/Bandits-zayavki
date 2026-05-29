@@ -402,13 +402,38 @@ const KNOWN_CATS = ['Салати','Тортила','Трамезини','Чаб
 
 function parseSheet(rows) {
   if(!rows || rows.length < 3) return null;
-  let hdr = 1;
-  for(let i=0;i<4;i++) {
-    if(rows[i] && rows[i].filter(c=>c&&typeof c==='string'&&c.length>1).length>1){hdr=i;break;}
+  
+  // Намери header реда - това е реда с НАЙ-МНОГО non-empty cells на колони >= 3
+  // (където са обектите). Така ще пропусне Title row и Date row.
+  let hdr = 0, bestCount = 0;
+  for(let i = 0; i < Math.min(6, rows.length); i++) {
+    const row = rows[i] || [];
+    let count = 0;
+    for(let c = 3; c < row.length; c++) {
+      const v = row[c];
+      if(v && typeof v === 'string' && v.trim().length > 1) count++;
+    }
+    if(count > bestCount) { bestCount = count; hdr = i; }
   }
-  const objects=[], objCols={};
-  (rows[hdr]||[]).forEach((c,i)=>{
-    if(i>=3&&c&&String(c).trim()){const n=String(c).trim();objects.push(n);objCols[n]=i;}
+  // Ако не сме намерили колони с обекти, fallback
+  if(bestCount === 0) {
+    for(let i = 0; i < 4; i++) {
+      if(rows[i] && rows[i].filter(c => c && typeof c === 'string' && c.length > 1).length > 1) {
+        hdr = i; break;
+      }
+    }
+  }
+  
+  const objects = [], objCols = {};
+  (rows[hdr] || []).forEach((c, i) => {
+    if(i >= 3 && c && String(c).trim()) {
+      const n = String(c).trim();
+      // Игнориране на технически колони като "ОБЩО"
+      if(n.toUpperCase() !== 'ОБЩО' && n !== 'ОБЩА ЗАЯВКА') {
+        objects.push(n);
+        objCols[n] = i;
+      }
+    }
   });
   if(!objects.length) return null;
   
@@ -457,7 +482,16 @@ function parseSheet(rows) {
         objects.forEach(obj => {
           const ci = objCols[obj];
           const v = ci < row.length ? row[ci] : null;
-          qtys[obj] = (typeof v === 'number') ? v : (v ? parseInt(v)||0 : 0);
+          // Усилено парсване: number, string with number, или празно/0
+          let n = 0;
+          if(typeof v === 'number') {
+            n = Math.round(v);
+          } else if(v != null && v !== '') {
+            const s = String(v).trim().replace(',', '.');
+            const parsed = parseFloat(s);
+            if(!isNaN(parsed) && parsed > 0) n = Math.round(parsed);
+          }
+          qtys[obj] = n;
         });
         cat.items.push({name: c1.trim(), qtys, origQtys: {...qtys}});
       }
