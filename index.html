@@ -936,6 +936,46 @@ function updateSubject() {
   // Sync header dates to modal if modal dates empty
 }
 
+
+// ===== ИЗПРАЩАНЕ КЪМ АПИТО (добавено — нищо във вида на приложението не се променя) =====
+// Заявката отива направо в системата на Бандитс, освен че се записва като Excel.
+// Ако няма интернет или нещо се обърка, Excel-ът пак се прави — работата не спира.
+const ZAYAVKI_API = 'https://script.google.com/macros/s/AKfycbzxTtMoij_A6yORV2-OE2RBEF1U5ZkEo1vAQZOMaYW4U_32KPbrKQ-7wnuLbTmMjmJrmQ/exec';
+
+function bgDate(iso) {           // „2026-09-18" -> „18.09.2026"
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : String(iso);
+}
+function collectOrderRows() {
+  const rows = [];
+  sheets.forEach(sn => {
+    const p = WB[sn];
+    if (!p) return;
+    p.categories.forEach(cat => {
+      cat.items.forEach(it => {
+        p.objects.forEach(obj => {
+          const q = Number(it.qtys[obj]) || 0;
+          if (q > 0) rows.push({ obekt: obj, art: it.name, cat: cat.name, qty: q });
+        });
+      });
+    });
+  });
+  return rows;
+}
+async function sendOrderToApi(prodDateIso, delDateIso) {
+  const rows = collectOrderRows();
+  if (!rows.length) return { skipped: true };
+  const res = await fetch(ZAYAVKI_API, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'saveOrderVersion', payload: {
+      dateDelivery: bgDate(delDateIso), dateProduction: bgDate(prodDateIso),
+      sentBy: 'Мони', rows,
+    }}),
+  });
+  return JSON.parse(await res.text());
+}
+
 // ===== GENERATE EXCEL (ExcelJS - with formatting, print setup, bold) =====
 async function generateAndSave() {
   const prodDate=document.getElementById('pProdDate').value||'';
@@ -952,6 +992,11 @@ async function generateAndSave() {
     
     // ⭐ Запис в архива при успешно генериране на Excel
     saveToArchive(finalName.replace(/\.xlsx$/i,''));
+
+    // ⭐ Изпращане към системата на Бандитс — тихо, без да пречи на Excel-а
+    sendOrderToApi(prodDate, delDate)
+      .then(r => { if (r && r.ok) toast('✅ Изпратено към Бандитс (версия ' + r.version + ')'); })
+      .catch(() => toast('⚠️ Excel е готов, но изпращането не мина'));
     
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
