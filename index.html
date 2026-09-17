@@ -141,6 +141,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .spin{width:44px;height:44px;border:3px solid #2c3347;border-top-color:#f5a623;border-radius:50%;animation:sp .8s linear infinite;margin-bottom:12px}
 @keyframes sp{to{transform:rotate(360deg)}}
   .qhint{font-size:10px;color:#8a94a6;font-weight:400;margin-top:1px;}
+  .btn-prev{background:#f0a32a;color:#12151b;border:none;border-radius:8px;padding:8px 14px;
+    font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn-prev:hover{filter:brightness(1.08);}
+  .btn-prev:disabled{opacity:.5;cursor:default;}
 </style>
 </head>
 <body>
@@ -179,12 +183,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
         <option>Четвъртък</option><option>Петък</option><option>Събота</option>
       </select>
-      <input class="di" id="dDelDate" placeholder="Дата доставка" oninput="updateSubject();autoSave()" onblur="autoLoadPreviousOrder()">
+      <input class="di" id="dDelDate" placeholder="Дата доставка" oninput="updateSubject();autoSave();autoLoadDebounced()" onblur="autoLoadPreviousOrder()">
       <select class="di-sel di" id="dDelDay" onchange="updateSubject();autoSave();autoLoadPreviousOrder()">
         <option value="">Ден доставка</option>
         <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
         <option>Четвъртък</option><option>Петък</option><option>Събота</option>
       </select>
+      <button class="btn-prev" onclick="autoLoadPreviousOrder(true)"
+        title="Попълва количествата от предната заявка за същия ден">📋 Предната заявка</button>
     </div>
   </div>
 
@@ -989,11 +995,21 @@ let RETURN_STATS = {};              // 'обект|категория|име' ->
 
 function bgDateOk(s) { return /^\d{2}\.\d{2}\.\d{4}$/.test(String(s||'').trim()); }
 
-async function autoLoadPreviousOrder() {
+// Задейства се САМО след като датата е пълна и човекът е спрял да пише за малко.
+// Така не се налага да се щрака никъде — попълва се от само себе си.
+let AUTOLOAD_TIMER = null;
+function autoLoadDebounced() {
+  clearTimeout(AUTOLOAD_TIMER);
+  const v = (document.getElementById('dDelDate')||{}).value || '';
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(v.trim())) return;   // още не е дописана
+  AUTOLOAD_TIMER = setTimeout(() => autoLoadPreviousOrder(), 700);
+}
+async function autoLoadPreviousOrder(manual) {
   const delVal = (document.getElementById('dDelDate')||{}).value || '';
-  if (!bgDateOk(delVal)) return;
-  if (!sheets.length) return;                 // няма качен файл още — няма върху какво да наслагва
-  if (PREV_ORDER_LOADED_FOR === delVal) return; // вече приложено за тази дата
+  if (!bgDateOk(delVal)) { if (manual) toast('Първо попълни датата на доставка'); return; }
+  if (!sheets.length) { if (manual) toast('Първо качи файла на заявката'); return; }
+  // при ръчно натискане се презарежда дори да е правено вече за тази дата
+  if (!manual && PREV_ORDER_LOADED_FOR === delVal) return;
 
   try {
     const [prevRes, statsRes] = await Promise.all([
