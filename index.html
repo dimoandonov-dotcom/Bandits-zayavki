@@ -140,6 +140,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .loverlay.show{display:flex}
 .spin{width:44px;height:44px;border:3px solid #2c3347;border-top-color:#f5a623;border-radius:50%;animation:sp .8s linear infinite;margin-bottom:12px}
 @keyframes sp{to{transform:rotate(360deg)}}
+  .qhint{font-size:10px;color:#8a94a6;font-weight:400;margin-top:1px;}
 </style>
 </head>
 <body>
@@ -178,8 +179,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
         <option>Четвъртък</option><option>Петък</option><option>Събота</option>
       </select>
-      <input class="di" id="dDelDate" placeholder="Дата доставка" oninput="updateSubject();autoSave()">
-      <select class="di-sel di" id="dDelDay" onchange="updateSubject();autoSave()">
+      <input class="di" id="dDelDate" placeholder="Дата доставка" oninput="updateSubject();autoSave()" onblur="autoLoadPreviousOrder()">
+      <select class="di-sel di" id="dDelDay" onchange="updateSubject();autoSave();autoLoadPreviousOrder()">
         <option value="">Ден доставка</option>
         <option>Понеделник</option><option>Вторник</option><option>Сряда</option>
         <option>Четвъртък</option><option>Петък</option><option>Събота</option>
@@ -378,6 +379,7 @@ function loadFile(file) {
       const n = file.name.replace(/\.xlsx?$/i,'');
       document.getElementById('pFileName').value = file.name;
       showApp();
+      autoLoadPreviousOrder();
     } catch(err) {
       alert('Грешка при четене: ' + err.message);
     }
@@ -811,7 +813,7 @@ function renderEditObj() {
       const q=item.qtys[curObj]||0;
       const chg=q!==(item.origQtys[curObj]||0);
       html+=`<div class="irow">
-        <span class="iname">${item.name}</span>
+        <span class="iname">${item.name}${prevHint(cat.name,item,curObj)}</span>
         <div class="qwrap">
           <button class="qbtn" onclick="chgQ(${ci},${ii},-1)">−</button>
           <input id="inp_${ci}_${ii}" class="qinp${chg?' chg':''}" type="number" value="${q}" min="0"
@@ -974,6 +976,70 @@ async function sendOrderToApi(prodDateIso, delDateIso) {
     }}),
   });
   return JSON.parse(await res.text());
+}
+
+
+// ===== АВТОМАТИЧНО ЗАРЕЖДАНЕ НА ПРЕДНА ЗАЯВКА + АНАЛИЗ НА ВРЪЩАНИЯТА =====
+// Щом зададеш дата на доставка, апито само́ намира последната заявка за същия ден от
+// седмицата (напр. понеделник -> предния понеделник) и попълва количествата от нея —
+// вече не се налага да търсиш и качваш стария файл. Плюс под всяко поле — колко е било
+// предния път и какъв процент се връща средно, ако вече има достатъчно история.
+let PREV_ORDER_LOADED_FOR = null;   // за коя дата вече е приложено, за да не се дърпа повторно
+let RETURN_STATS = {};              // 'обект|категория|име' -> {pct,...}
+
+function bgDateOk(s) { return /^\d{2}\.\d{2}\.\d{4}$/.test(String(s||'').trim()); }
+
+async function autoLoadPreviousOrder() {
+  const delVal = (document.getElementById('dDelDate')||{}).value || '';
+  if (!bgDateOk(delVal)) return;
+  if (!sheets.length) return;                 // няма качен файл още — няма върху какво да наслагва
+  if (PREV_ORDER_LOADED_FOR === delVal) return; // вече приложено за тази дата
+
+  try {
+    const [prevRes, statsRes] = await Promise.all([
+      fetch(ZAYAVKI_API + '?action=getPreviousOrder&date=' + encodeURIComponent(delVal)).then(r=>r.json()),
+      fetch(ZAYAVKI_API + '?action=getReturnStatsForMony&weeks=4').then(r=>r.json()),
+    ]);
+    if (statsRes && statsRes.ok) RETURN_STATS = statsRes.rows || {};
+
+    if (!prevRes || !prevRes.ok || !prevRes.found) {
+      PREV_ORDER_LOADED_FOR = delVal;
+      renderObjList(); renderEditObj();
+      return;
+    }
+    let matched = 0, total = prevRes.rows.length;
+    prevRes.rows.forEach(row => {
+      sheets.forEach(sn => {
+        const d = WB[sn];
+        if (!d.objects.includes(row.obekt)) return;
+        d.categories.forEach(cat => {
+          if (cat.name !== row.cat) return;
+          cat.items.forEach(item => {
+            if (item.name !== row.art) return;
+            item.qtys[row.obekt] = row.qty;
+            item.origQtys[row.obekt] = row.qty;
+            matched++;
+          });
+        });
+      });
+    });
+    PREV_ORDER_LOADED_FOR = delVal;
+    autoSave();
+    renderObjList(); renderEditObj();
+    toast(`📋 Заредена заявка от ${prevRes.dateDelivery} (v${prevRes.version}) — ${matched}/${total} съвпадения`);
+  } catch (e) {
+    console.warn('Автозареждане на предна заявка неуспешно:', e);
+  }
+}
+// Малка подсказка под полето за количество: предна стойност + % връщане, ако е надежден.
+function prevHint(cat, item, obj) {
+  const key = obj + '|' + cat + '|' + item.name;
+  const st = RETURN_STATS[key];
+  const prev = item.origQtys[obj];
+  const parts = [];
+  if (prev) parts.push('пред: ' + prev);
+  if (st && st.pct !== null && st.pct !== undefined) parts.push('връща ' + st.pct + '%');
+  return parts.length ? `<div class="qhint">${parts.join(' · ')}</div>` : '';
 }
 
 // ===== GENERATE EXCEL (ExcelJS - with formatting, print setup, bold) =====
