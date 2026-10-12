@@ -123,6 +123,8 @@ function mergeCats(pairs) {   // pairs: ['Категория|Артикул', ..
   });
 }
 const CHAINS = ['300', 'СИТИ', 'СТАР', 'БУЛМАГ', 'Други'];
+// Обекти, които Bella не обикаля — не се показват в списъка.
+const HIDE = ['ДИВ 97 БУРГАС'];
 
 const S = { objects: [], deliv: {}, chain: '300', cur: null, qty: {}, showAll: false, sent: {},
             orders: {},      // регистрово име -> { 'дд.мм.гггг': { 'кат|арт': бр. } } — доставки по заявките на Мони за последните 7 дни
@@ -265,6 +267,7 @@ function apply(rows) {
     objs.add(o);
     if ((rows[k].delivered || 0) > 0) (deliv[o] = deliv[o] || {})[c + '|' + a] = rows[k].delivered;
   });
+  HIDE.forEach(h => objs.delete(h));
   S.objects = [...objs].sort((a, b) => shortName(a).localeCompare(shortName(b), 'bg'));
   S.deliv = deliv;
   renderTabs(); renderList();
