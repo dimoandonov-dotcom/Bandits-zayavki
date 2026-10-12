@@ -1106,20 +1106,32 @@ function suggestQty(prev, pct) {
   return Math.max(0, Math.round(prev * (1 - pct / 100)) + 1);
 }
 function retInfo(cat, item, obj) {
-  const st = RETURN_STATS[obj + '|' + cat + '|' + item.name];
-  if (!st || st.pct === null || st.pct === undefined) return null;
+  const key = obj + '|' + cat + '|' + item.name;
+  const st0 = RETURN_STATS[key];
+  const st = (st0 && st0.pct !== null && st0.pct !== undefined) ? st0 : null;
+  const lo = LEFTOVERS[key] || null;                 // остатък от обхода (Viber)
+  if (!st && !lo) return null;
   const cur = Number(item.qtys[obj]) || 0;
   const base = Number(item.origQtys[obj]) || cur;   // от предната заявка, за да не се намалява двойно
-  const hot = st.pct >= RET_LIMIT && cur > 0;
-  const sugg = hot ? suggestQty(base, st.pct) : null;
-  return { st, cur, hot, sugg: (sugg !== null && sugg < cur) ? sugg : null };
+  const hotRet = !!st && st.pct >= RET_LIMIT;
+  const hotLeft = !!lo && base > 0 && lo.qty >= base * 0.5;
+  const hot = (hotRet || hotLeft) && cur > 0;
+  let sugg = null;
+  if (hot) {
+    const c = [];
+    if (hotRet) c.push(suggestQty(base, st.pct));
+    if (hotLeft) c.push(Math.max(0, base - lo.qty) + 1);   // продадено миналия път + 1 резерв
+    sugg = Math.min.apply(null, c);
+  }
+  return { st: st || { pct: '–', returned: 0, delivered: 0 }, lo, cur, hot, sugg: (sugg !== null && sugg < cur) ? sugg : null };
 }
 function prevHint(cat, item, obj) {
   const prev = item.origQtys[obj];
   const ri = retInfo(cat, item, obj);
   const parts = [];
   if (prev) parts.push('пред: ' + prev);
-  if (ri) parts.push('връща ' + ri.st.pct + '% (' + ri.st.returned + '/' + ri.st.delivered + ')');
+  if (ri && ri.st.delivered) parts.push('връща ' + ri.st.pct + '% (' + ri.st.returned + '/' + ri.st.delivered + ')');
+  if (ri && ri.lo) parts.push('остатък ' + ri.lo.qty + ' (' + ri.lo.date.slice(0, 5) + ')');
   if (!parts.length) return '';
   let btn = '';
   if (ri && ri.sugg !== null) {
@@ -1144,8 +1156,13 @@ function objWarn(dist, obj) {
 }
 // Зарежда статистиката за връщанията и без дата (при отваряне на заявката)
 let RET_LOADED = false;
+let LEFTOVERS = {};   // 'обект|категория|артикул' -> {qty, date} — остатъци от обхода във Viber
 async function loadReturnStats() {
   if (RET_LOADED) return;
+  // остатъците са по желание — ако апито още не ги поддържа, просто ги няма
+  fetch(ZAYAVKI_API + '?action=getLeftovers&days=2').then(x => x.json())
+    .then(r => { if (r && r.ok) { LEFTOVERS = r.rows || {}; renderObjList(); if (curObj) renderEditObj(); } })
+    .catch(() => {});
   try {
     const r = await fetch(ZAYAVKI_API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
     if (r && r.ok) { RETURN_STATS = r.rows || {}; RET_LOADED = true; renderObjList(); if (curObj) renderEditObj(); }
@@ -1168,15 +1185,15 @@ async function openRetModal() {
   const hot = collectHot();
   const withSugg = hot.filter(h => h.sugg !== null);
   let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <b style="font-size:15px">⚠️ Високо връщане (≥${RET_LIMIT}%, последни 4 седмици)</b>
+      <b style="font-size:15px">⚠️ Високо връщане (≥${RET_LIMIT}%, 4 седмици) и големи остатъци</b>
       <button onclick="closeRetModal()" class="btn-hdr">✕</button></div>`;
   if (!RET_LOADED) html += '<div style="color:#ff8a80">Няма връзка с апито — опитай пак.</div>';
   else if (!hot.length) html += '<div style="color:#66bb6a">Няма артикули с високо връщане в тази заявка 👍</div>';
   else {
-    html += `<div style="font-size:12px;color:#8a94a6;margin-bottom:6px">Предложение = заявено × (1 − %връщане) + 1 резерв. Нищо не се сменя, докато не натиснеш.</div>`;
+    html += `<div style="font-size:12px;color:#8a94a6;margin-bottom:6px">Предложение = заявено × (1 − %връщане) + 1, или продадено миналия път (заявено − остатък) + 1 — по-малкото. Нищо не се сменя, докато не натиснеш.</div>`;
     hot.forEach((h, k) => {
       html += `<div class="ret-row"><span class="r-n"><b>${h.obj}</b><br>${h.cat} · ${h.name}</span>
-        <span class="r-p">${h.st.pct}% (${h.st.returned}/${h.st.delivered})</span>
+        <span class="r-p">${h.st.delivered ? h.st.pct + '% (' + h.st.returned + '/' + h.st.delivered + ')' : ''}${h.lo ? '<br>остатък ' + h.lo.qty : ''}</span>
         <span style="white-space:nowrap">${h.cur}${h.sugg !== null ? ` → <b>${h.sugg}</b> <button class="sugg-btn" onclick="applyHot(${k})">приложи</button>` : ''}</span></div>`;
     });
     if (withSugg.length) html += `<button class="btn-ret" style="width:100%;margin-top:12px;padding:12px" onclick="applyAllHot()">✓ Приложи всички ${withSugg.length} предложения</button>`;
