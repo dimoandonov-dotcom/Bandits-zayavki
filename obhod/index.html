@@ -155,6 +155,30 @@ button{font-family:inherit;color:inherit}
 /* изблик от листенца при изпращане */
 .burst{position:fixed;width:12px;height:10px;border-radius:70% 30% 70% 30%;pointer-events:none;z-index:100;background:linear-gradient(135deg,#f3c6cc,#c9909a);animation:burst 1.3s cubic-bezier(.2,.7,.3,1) forwards}
 @keyframes burst{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+/* начален екран: само веригите, като бонбонени кутии */
+#chains{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 16px 48px}
+#chains:empty{display:none}
+.chain{position:relative;overflow:hidden;border:0;border-radius:26px;padding:18px 16px 16px;text-align:left;cursor:pointer;color:#fff;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;
+  box-shadow:0 12px 26px rgba(110,64,56,.25);animation:rise .6s cubic-bezier(.2,.8,.2,1) both;transition:transform .2s}
+.chain:active{animation:jelly .45s}
+.chain:first-child{grid-column:1 / -1;min-height:170px}
+.chain .ic{position:absolute;right:12px;top:12px;width:58px;height:58px;background:center/contain no-repeat;animation:float 3.5s ease-in-out infinite;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
+.chain:first-child .ic{width:78px;height:78px}
+.chain b{font-family:var(--f-d);font-size:34px;font-weight:600;line-height:1;letter-spacing:.5px}
+.chain:first-child b{font-size:46px}
+.chain span{font-size:13px;font-weight:800;opacity:.92}
+.chain .cp{height:8px;border-radius:8px;background:rgba(255,255,255,.35);overflow:hidden}
+.chain .cp i{display:block;height:100%;border-radius:8px;background:repeating-linear-gradient(-45deg,#fff 0 6px,rgba(255,255,255,.7) 6px 12px);background-size:17px 17px;animation:stripes 1s linear infinite}
+.chain::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 18% 22%,rgba(255,255,255,.35) 2px,transparent 2.5px) 0 0/26px 26px;opacity:.5;pointer-events:none}
+.chain.done{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ok),0 12px 26px rgba(110,64,56,.25)}
+.c0{background:linear-gradient(135deg,#e9a3b3,#c9718a 60%,#a85570)}
+.c1{background:linear-gradient(135deg,#9b6355,#6e4038)}
+.c2{background:linear-gradient(135deg,#f3b8a6,#d98a7a)}
+.c3{background:linear-gradient(135deg,#c8a2d8,#9a73b5)}
+.c4{background:linear-gradient(135deg,#9fcfba,#6faa90)}
+.lhdr{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.lhdr[hidden]{display:none}
+.search{margin-top:16px!important}
 /* ежедневен подарък — букет */
 #gift{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:20px;background:rgba(91,58,64,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadein .4s both}
 #gift[hidden]{display:none}
@@ -167,6 +191,10 @@ button{font-family:inherit;color:inherit}
 .gbox svg{width:100%;height:auto;display:block;margin:6px auto 0;max-height:46vh}
 .gname{font-family:var(--f-d);font-size:24px;font-weight:600;color:var(--choc);margin-top:2px}
 .gmean{font-size:14px;color:var(--fg);font-weight:600;margin:4px 6px 14px;line-height:1.4}
+.gchoc{display:flex;align-items:center;gap:12px;text-align:left;margin:-4px 4px 14px;padding:12px;border-radius:18px;background:linear-gradient(135deg,#7c4a40,#5a322b);color:var(--cream);animation:giftin .8s .9s cubic-bezier(.3,1.4,.5,1) both}
+.gchoc svg{width:76px;flex:none;margin:0}
+.gchoc b{font-family:var(--f-d);font-size:20px;display:block;font-weight:600}
+.gchoc span{font-size:13px;font-weight:600;opacity:.9}
 .gbtn{border:0;border-radius:999px;padding:15px 26px;font-weight:900;font-size:16px;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--rose),var(--deep));box-shadow:0 10px 22px rgba(143,85,98,.35)}
 .stem{transform-box:fill-box;transform-origin:50% 100%;animation:grow .9s cubic-bezier(.2,.8,.2,1) both}
 @keyframes grow{from{transform:scaleY(0)}}
@@ -195,9 +223,10 @@ button{font-family:inherit;color:inherit}
 
 <div id="home">
   <div class="quote" id="quote" onclick="nextQuote()"><p id="qtext">Сладка мисъл за теб…</p><small>докосни за следваща</small></div>
-  <div class="tabs" id="tabs"></div>
   <input class="search" id="q" type="search" placeholder="Търси обект…" autocomplete="off">
-  <div id="list"><div class="empty">Зареждам обектите…</div></div>
+  <div class="lhdr" id="lhdr" hidden><button class="back" onclick="closeChain()">← Вериги</button><div class="oname" id="lname"></div></div>
+  <div id="chains"></div>
+  <div id="list"></div>
 </div>
 
 <div id="objView">
@@ -221,6 +250,7 @@ button{font-family:inherit;color:inherit}
     <div id="gsvg"></div>
     <div class="gname" id="gname"></div>
     <div class="gmean" id="gmean"></div>
+    <div class="gchoc" id="gchoc" hidden></div>
     <button class="gbtn" onclick="closeGift()">Благодаря ♥</button>
   </div>
 </div>
@@ -403,15 +433,31 @@ function apply(rows) {
   renderTabs(); renderList();
 }
 
-// ---- списък с обекти ----
-function renderTabs() {
-  $('tabs').innerHTML = CHAINS.map(c => `<button class="tab ${c === S.chain ? 'on' : ''}" onclick="setChain('${c}')">${c}</button>`).join('');
-}
-function setChain(c) { S.chain = c; ls('obhod_chain', c); $('q').value = ''; renderTabs(); renderList(); }
+// ---- начален екран: веригите; списък с обекти само след избор на верига или при търсене ----
+const CHAIN_ICON = { '300': 0, 'СИТИ': 1, 'СТАР': 2, 'БУЛМАГ': 5, 'Други': 3 };
+function renderTabs() {}   // старото име се вика от apply(); вече няма табове
+function openChain(c) { S.open = c; $('q').value = ''; renderList(); window.scrollTo(0, 0); }
+function closeChain() { S.open = null; renderList(); window.scrollTo(0, 0); }
+function setChain(c) { openChain(c); }
 function renderList() {
   const q = $('q').value.trim().toUpperCase();
-  const list = S.objects.filter(o => q ? o.toUpperCase().includes(q) : chainOf(o) === S.chain);
   updateHello();
+  if (!q && !S.open) {   // само веригите
+    $('lhdr').hidden = true; $('list').innerHTML = '';
+    if (!S.objects.length) { $('chains').innerHTML = '<div class="empty" style="grid-column:1/-1">Зареждам обектите…</div>'; return; }
+    $('chains').innerHTML = CHAINS.map((c, i) => {
+      const objs = S.objects.filter(o => chainOf(o) === c); if (!objs.length) return '';
+      const done = objs.filter(o => S.sent[o]).length, pct = Math.round(done / objs.length * 100);
+      const ic = (typeof CANDIES !== 'undefined' ? CANDIES[CHAIN_ICON[c] ?? i] : '').replace(/"/g, '&quot;');
+      return `<button class="chain c${i} ${done === objs.length ? 'done' : ''}" style="animation-delay:${i * 70}ms" onclick="openChain('${c}')">
+        <span class="ic" style="background-image:${ic};animation-delay:${-i * .7}s"></span>
+        <b>${c}</b><span>${objs.length} обекта · минати ${done}</span><div class="cp"><i style="width:${pct}%"></i></div></button>`;
+    }).join('');
+    return;
+  }
+  $('chains').innerHTML = '';
+  $('lhdr').hidden = false; $('lname').textContent = q ? 'Търсене' : S.open;
+  const list = S.objects.filter(o => q ? o.toUpperCase().includes(q) : chainOf(o) === S.open);
   $('list').innerHTML = list.length ? list.map((o, i) => {
     const s = S.sent[o];
     return `<button class="obj ${s ? 'done' : ''}" style="animation-delay:${Math.min(i, 12) * 40}ms" onclick="openObj(${JSON.stringify(o).replace(/"/g, '&quot;')})">
@@ -422,7 +468,7 @@ $('q').addEventListener('input', renderList);
 function updateHello() {
   const h = new Date().getHours();
   $('hello').innerHTML = (h < 11 ? 'Добро утро' : h < 18 ? 'Здравей' : 'Добър вечер') + ', <i>Белла</i>';
-  const inChain = S.objects.filter(o => chainOf(o) === S.chain), done = inChain.filter(o => S.sent[o]).length;
+  const inChain = S.objects.filter(o => !S.open || chainOf(o) === S.open), done = inChain.filter(o => S.sent[o]).length;
   const all = Object.keys(S.sent).length;
   $('today').textContent = 'Днес ' + todayBg().slice(0, 5) + ' · минати ' + all + (all === 1 ? ' обект' : ' обекта');
   $('progBar').style.width = inChain.length ? Math.round(done / inChain.length * 100) + '%' : '0';
@@ -667,6 +713,16 @@ function showGift() {
   $('gname').textContent = f.n;
   $('gmean').textContent = f.m;
   $('gsvg').innerHTML = bouquetSVG(f);
+  // в петък — и шоколадова изненада до букета
+  const fri = new Date().getDay() === 5;
+  $('gchoc').hidden = !fri;
+  if (fri) {
+    const choc = (x, y, c) => `<circle cx="${x}" cy="${y}" r="9" fill="${c}"/><path d="M${x - 5} ${y - 2} q5 -4 10 0" stroke="#fff" stroke-opacity=".35" stroke-width="2" fill="none"/>`;
+    $('gchoc').innerHTML = `<svg viewBox="0 0 80 74"><path d="M40 72C2 46 4 8 24 6c9-1 14 5 16 10 2-5 7-11 16-10 20 2 22 40-16 66Z" fill="#c9718a"/>
+      <path d="M40 64C10 44 12 15 26 14c8 0 11 6 14 10 3-4 6-10 14-10 14 1 16 30-14 50Z" fill="#f6d5d8"/>
+      ${choc(30, 28, '#6e4038')}${choc(50, 28, '#9b6355')}${choc(40, 44, '#5a322b')}${choc(27, 46, '#f2a7b5')}${choc(53, 46, '#6e4038')}</svg>
+      <div><b>Петъчна шоколадова изненада</b><span>Седмицата е твоя — почерпи се с нещо шоколадово. Заслужи си го!</span></div>`;
+  }
   $('gift').hidden = false;
   setTimeout(() => petalBurst($('gname')), 900);
 }
