@@ -102,6 +102,8 @@ button{font-family:inherit}
 const API = 'https://script.google.com/macros/s/AKfycbzxTtMoij_A6yORV2-OE2RBEF1U5ZkEo1vAQZOMaYW4U_32KPbrKQ-7wnuLbTmMjmJrmQ/exec';
 
 // Артикулите — същите категории и имена като в заявката на Мони, за да се връзват 1:1.
+// Основният списък. Всичко ново, което Мони добави в заявката (напр. закуските), се
+// добавя само от заявките — не трябва да се пипа кодът при нов артикул.
 const CATS = [
   ['Салати',    ['Свеж микс','Пилешка','Фусили','Овчарска','Риба тон']],
   ['Тортила',   ['Чоризо','Шунка','Пиле','Салами','Капрезе','Риба Тон','Чипотле']],
@@ -111,6 +113,14 @@ const CATS = [
   ['Багети',    ['Шунка','Пиле','Шпек салам','Луканка']],
   ['Десерти',   ['Еклер','Чийз кейк','Гранола','Тирамису','Профитерол','Торта Домашна','Шоколадова торта']],
 ];
+function mergeCats(pairs) {   // pairs: ['Категория|Артикул', ...] от заявките
+  pairs.forEach(k => {
+    const [c, a] = k.split('|'); if (!c || !a) return;
+    let cat = CATS.find(x => x[0] === c);
+    if (!cat) { cat = [c, []]; CATS.push(cat); }
+    if (!cat[1].includes(a)) cat[1].push(a);
+  });
+}
 const CHAINS = ['300', 'СИТИ', 'СТАР', 'БУЛМАГ', 'Други'];
 
 const S = { objects: [], deliv: {}, chain: '300', cur: null, qty: {}, showAll: false, sent: {},
@@ -187,6 +197,7 @@ async function loadOrders() {
     });
   });
   S.orders = orders; ls('obhod_orders', { date: todayBg(), orders });
+  Object.values(orders).forEach(o => Object.values(o).forEach(day => mergeCats(Object.keys(day))));
   if (S.cur) renderObj();
 }
 
@@ -215,7 +226,7 @@ async function load() {
     const r = await fetch(API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
     if (r && r.ok) { apply(r.rows); ls('obhod_cache', r.rows); }
   } catch (e) { if (!cache) $('list').innerHTML = '<div class="empty">Няма интернет. Опитай пак след малко.</div>'; }
-  const oc = ls('obhod_orders'); if (oc && oc.date === todayBg()) S.orders = oc.orders || {};
+  const oc = ls('obhod_orders'); if (oc && oc.date === todayBg()) { S.orders = oc.orders || {}; Object.values(S.orders).forEach(o => Object.values(o).forEach(day => mergeCats(Object.keys(day)))); }
   const ti = ls('obhod_todayin'); if (ti && ti.date === todayBg()) S.todayIn = ti.objs || {};
   loadOrders().catch(() => {});
   flushQueue();
