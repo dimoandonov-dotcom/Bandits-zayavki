@@ -485,7 +485,7 @@ function openObj(o) {
   document.documentElement.style.setProperty('--hdrH', $('hdr').offsetHeight + 'px');
   renderObj(); window.scrollTo(0, 0);
 }
-function closeObj() { $('objView').classList.remove('show'); $('home').hidden = false; S.cur = null; renderList(); }
+function closeObj() { $('objView').classList.remove('show'); $('home').hidden = false; S.cur = null; renderList(); if (S.pendingReload) reloadNow(); }
 function usual(c, a) { return (S.deliv[S.cur] || {})[c + '|' + a] || 0; }
 function setTodayIn(v) { S.todayIn[S.cur] = v; ls('obhod_todayin', { date: todayBg(), objs: S.todayIn }); renderObj(); }
 function renderDl() {
@@ -728,6 +728,25 @@ function showGift() {
 }
 function closeGift() { $('gift').hidden = true; ls('obhod_gift', todayBg()); }
 if (ls('obhod_gift') !== todayBg()) setTimeout(showGift, 600);
+
+// ---- самообновяване: когато има нова версия, приложението се презарежда само ----
+// Проверява при отваряне, на всеки 5 минути и когато Белла се върне в приложението.
+// Ако в момента попълва обект, изчаква да излезе от него (черновата се пази и без това).
+function hashText(t) { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return h; }
+async function checkUpdate() {
+  try {
+    const [a, b] = await Promise.all(['', 'quotes.js'].map(f =>
+      fetch((f || location.pathname) + '?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '')));
+    if (!a) return;
+    const h = hashText(a) + ':' + hashText(b);
+    if (!S.verHash) { S.verHash = h; return; }
+    if (h !== S.verHash) { if (S.cur) S.pendingReload = true; else reloadNow(); }
+  } catch (e) { /* няма интернет — пробваме пак по-късно */ }
+}
+function reloadNow() { toast('✨ Има нова версия — обновявам…'); setTimeout(() => location.reload(), 1200); }
+checkUpdate();
+setInterval(checkUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkUpdate(); flushQueue(); } });
 
 load();
 </script>
