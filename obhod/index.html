@@ -58,6 +58,12 @@ button{font-family:inherit}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ok);color:#111;font-weight:800;font-size:14px;padding:11px 20px;border-radius:30px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:90vw;text-align:center}
 .toast.err{background:var(--warn)}
 .toast.on{opacity:1}
+.dl{margin:12px 14px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;font-size:14px}
+.dl b{color:var(--accent)}
+.dl .ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.yn{border:1px solid var(--line);background:#242838;color:var(--fg);border-radius:10px;padding:10px 16px;font-weight:800;font-size:15px;cursor:pointer}
+.yn.on{background:var(--accent);border-color:var(--accent);color:#111}
+.sold{color:var(--ok);font-weight:700}
 .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px}
 </style>
 </head>
@@ -78,6 +84,7 @@ button{font-family:inherit}
 
 <div id="objView">
   <div class="ohdr"><button class="back" onclick="closeObj()">← Обекти</button><div class="oname" id="oname"></div></div>
+  <div class="dl" id="dl" hidden></div>
   <div id="cats"></div>
   <button class="more" id="moreBtn" onclick="toggleMore()"></button>
   <textarea class="note" id="note" placeholder="Бележка (по желание): напр. „взех 5 сандвича за Лаврентий“"></textarea>
@@ -106,7 +113,9 @@ const CATS = [
 ];
 const CHAINS = ['300', 'СИТИ', 'СТАР', 'БУЛМАГ', 'Други'];
 
-const S = { objects: [], deliv: {}, chain: '300', cur: null, qty: {}, showAll: false, sent: {} };
+const S = { objects: [], deliv: {}, chain: '300', cur: null, qty: {}, showAll: false, sent: {},
+            orders: {},      // регистрово име -> { 'дд.мм.гггг': { 'кат|арт': бр. } } — доставки по заявките на Мони за последните 7 дни
+            todayIn: {} };   // обект -> true/false: днешната доставка заредена ли е преди обхода
 
 // ---- помощни ----
 const $ = id => document.getElementById(id);
@@ -117,6 +126,82 @@ function shortName(o) { return chainOf(o) === 'Други' || chainOf(o) === 'Б
 function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
 function toast(m, err) { const t = $('toast'); t.textContent = m; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(t._t); t._t = setTimeout(() => t.className = 'toast', 2600); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function parseBg(s) { const m = String(s || '').match(/^(\d{2})\.(\d{2})\.(\d{4})$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; }
+function fmtBg(d) { return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(); }
+const DNI = ['нд', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+function dayLbl(bg) { const d = parseBg(bg); return d ? DNI[d.getDay()] + ' ' + bg.slice(0, 5) : bg; }
+
+// ---- имената от заявката („Владислав“) → имената от регистъра („300 ВЛАДИСЛАВ“) ----
+const RCH = ['300', 'СИТИ', 'СТАР', 'АБЦ'];
+function nObj(s) { return String(s || '').toUpperCase().replace(/[.+]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function chW(r) { const w = nObj(r).split(' ')[0]; return RCH.includes(w) ? w : ''; }
+function baseO(r) { let n = nObj(r); const c = chW(r); if (c) n = n.slice(c.length).trim(); return n.replace(/^ДЕТ /, ''); }
+function cands(o) { const n = nObj(o), b = baseO(o); const ex = S.objects.filter(r => nObj(r) === n); return ex.length ? ex : S.objects.filter(r => baseO(r) === b); }
+
+// Заявката се пази като редове лист по лист. Новите редове носят името на листа (sheet);
+// при старите листът се познава по това, че двойката категория|артикул започва отначало.
+// Веригата на листа (300/СИТИ/СТАР) = веригата на повечето еднозначни обекти в него.
+function resolveOrder(rows) {
+  const blocks = []; let cur = null, seen = null, lastSheet;
+  rows.forEach(r => {
+    const k = r.cat + '|' + r.art + '|' + r.obekt;
+    const newBlock = r.sheet !== undefined ? r.sheet !== lastSheet : (!cur || seen.has(k));
+    if (newBlock) { cur = []; seen = new Set(); blocks.push(cur); lastSheet = r.sheet; }
+    seen.add(k); cur.push(r);
+  });
+  const out = [];
+  blocks.forEach(b => {
+    const cnt = {};
+    b.forEach(r => { const c = cands(r.obekt); if (c.length === 1) { const w = chW(c[0]); cnt[w] = (cnt[w] || 0) + 1; } });
+    const named = r0 => RCH.find(c => nObj(r0.sheet || '').split(' ').includes(c));
+    const chain = (b[0] && named(b[0])) || Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0] || '';
+    b.forEach(r => {
+      const c = cands(r.obekt);
+      const reg = c.length === 1 ? c[0] : (c.filter(x => chW(x) === chain)[0] || null);
+      if (reg) out.push({ reg, cat: r.cat, art: r.art, qty: Number(r.qty) || 0 });
+    });
+  });
+  return out;
+}
+
+// Последната заявка за всеки ден от седмицата (апито дава „предната заявка за същия ден“,
+// затова питаме за датата след 7 дни). Пазим доставките от последните 7 дни, вкл. днес.
+async function loadOrders() {
+  const today = parseBg(todayBg()), from = new Date(today); from.setDate(from.getDate() - 6);
+  const asks = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i + 7);
+    if (d.getDay() === 0) continue;   // в неделя няма доставки
+    asks.push(fetch(API + '?action=getPreviousOrder&date=' + fmtBg(d)).then(x => x.json()).catch(() => null));
+  }
+  const res = await Promise.all(asks);
+  const orders = {};
+  res.forEach(r => {
+    if (!r || !r.ok || !r.found) return;
+    const dd = parseBg(r.dateDelivery);
+    if (!dd || dd < from || dd > today) return;
+    resolveOrder(r.rows || []).forEach(x => {
+      const o = (orders[x.reg] = orders[x.reg] || {}), day = (o[r.dateDelivery] = o[r.dateDelivery] || {});
+      day[x.cat + '|' + x.art] = (day[x.cat + '|' + x.art] || 0) + x.qty;
+    });
+  });
+  S.orders = orders; ls('obhod_orders', { date: todayBg(), orders });
+  if (S.cur) renderObj();
+}
+
+// Какво би трябвало да има в обекта: последната доставка преди днес (шофьорът прибира
+// старото при всяка доставка) + днешната, ако вече е заредена преди обхода.
+function basis(o) {
+  const ord = S.orders[o] || {}, t = todayBg();
+  const days = Object.keys(ord).filter(d => d !== t).sort((a, b) => parseBg(b) - parseBg(a));
+  const prev = days[0] || null, today = ord[t] ? t : null;
+  const sum = {};
+  const add = d => Object.entries(ord[d]).forEach(([k, v]) => sum[k] = (sum[k] || 0) + v);
+  if (prev) add(prev);
+  if (today && S.todayIn[o] === true) add(today);
+  return { prev, today, sum };
+}
 
 // ---- зареждане: обектите и кой артикул какво получава (от статистиката за 4 седмици) ----
 async function load() {
@@ -130,6 +215,9 @@ async function load() {
     const r = await fetch(API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
     if (r && r.ok) { apply(r.rows); ls('obhod_cache', r.rows); }
   } catch (e) { if (!cache) $('list').innerHTML = '<div class="empty">Няма интернет. Опитай пак след малко.</div>'; }
+  const oc = ls('obhod_orders'); if (oc && oc.date === todayBg()) S.orders = oc.orders || {};
+  const ti = ls('obhod_todayin'); if (ti && ti.date === todayBg()) S.todayIn = ti.objs || {};
+  loadOrders().catch(() => {});
   flushQueue();
 }
 function apply(rows) {
@@ -172,17 +260,34 @@ function openObj(o) {
 }
 function closeObj() { $('objView').classList.remove('show'); $('home').hidden = false; S.cur = null; renderList(); }
 function usual(c, a) { return (S.deliv[S.cur] || {})[c + '|' + a] || 0; }
+function setTodayIn(v) { S.todayIn[S.cur] = v; ls('obhod_todayin', { date: todayBg(), objs: S.todayIn }); renderObj(); }
+function renderDl() {
+  const b = basis(S.cur), ord = S.orders[S.cur] || {}, el = $('dl');
+  const tot = d => Object.values(ord[d] || {}).reduce((s, v) => s + v, 0);
+  if (!b.prev && !b.today) { el.hidden = false; el.innerHTML = '<span>Няма заявка за този обект през последните 7 дни.</span>'; return; }
+  let h = '';
+  if (b.prev) h += `<div>Последна доставка: <b>${dayLbl(b.prev)}</b> · ${tot(b.prev)} бр.</div>`;
+  if (b.today) h += `<div class="ask"><span>Днешната доставка (<b>${tot(b.today)} бр.</b>) заредена ли е вече?</span>
+      <button class="yn ${S.todayIn[S.cur] === true ? 'on' : ''}" onclick="setTodayIn(true)">Да</button>
+      <button class="yn ${S.todayIn[S.cur] === false ? 'on' : ''}" onclick="setTodayIn(false)">Не</button></div>`;
+  el.hidden = false; el.innerHTML = h;
+}
 function renderObj() {
-  const hasUsual = Object.keys(S.deliv[S.cur] || {}).length > 0;
+  renderDl();
+  const B = basis(S.cur).sum;
+  const hasBasis = Object.keys(B).length > 0;
+  const hasUsual = hasBasis || Object.keys(S.deliv[S.cur] || {}).length > 0;
   let html = '', hidden = 0;
   CATS.forEach(([c, arts]) => {
-    const rows = arts.filter(a => S.showAll || !hasUsual || usual(c, a) > 0 || (S.qty[c + '|' + a] || 0) > 0);
+    const rows = arts.filter(a => S.showAll || !hasUsual || (hasBasis ? (B[c + '|' + a] || 0) > 0 : usual(c, a) > 0) || (S.qty[c + '|' + a] || 0) > 0);
     hidden += arts.length - rows.length;
     if (!rows.length) return;
     const tot = rows.reduce((s, a) => s + (S.qty[c + '|' + a] || 0), 0);
     html += `<div class="cat"><div class="cath"><span>${c}</span><span>${tot || ''}</span></div>` + rows.map(a => {
-      const k = c + '|' + a, v = S.qty[k] || 0, u = usual(c, a);
-      return `<div class="row"><span class="nm">${esc(a)}${u ? `<span class="h">доставени за 4 седм.: ${u}</span>` : ''}</span>
+      const k = c + '|' + a, v = S.qty[k] || 0, u = usual(c, a), bq = B[k] || 0;
+      const hint = bq ? `<span class="h">заредено ${bq} · остатък ${v} → <span class="sold">продадено ${Math.max(0, bq - v)}</span></span>`
+                 : (u ? `<span class="h">доставени за 4 седм.: ${u}</span>` : '');
+      return `<div class="row"><span class="nm">${esc(a)}${hint}</span>
         <div class="qw"><button class="qb" onclick="chg('${k}',-1)" aria-label="по-малко">−</button>
         <span class="qv ${v ? 'has' : ''}">${v}</span>
         <button class="qb" onclick="chg('${k}',1)" aria-label="повече">+</button></div></div>`;
@@ -192,7 +297,7 @@ function renderObj() {
   $('moreBtn').hidden = !hasUsual || (!S.showAll && hidden === 0);
   $('moreBtn').textContent = S.showAll ? 'Покажи само артикулите на обекта' : `+ Още ${hidden} артикула`;
   const total = Object.values(S.qty).reduce((s, v) => s + v, 0);
-  $('sendBtn').textContent = total ? `✓ ИЗПРАТИ ОСТАТЪЦИТЕ (${total} бр.)` : '✓ ИЗПРАТИ: НЯМА ОСТАТЪЦИ';
+  $('sendBtn').textContent = total ? `✓ ИЗПРАТИ ОСТАТЪЦИТЕ (${total} бр.)` : (hasBasis ? '✓ ИЗПРАТИ: ВСИЧКО Е ПРОДАДЕНО' : '✓ ИЗПРАТИ: НЯМА ОСТАТЪЦИ');
 }
 function chg(k, d) { S.qty[k] = Math.max(0, (S.qty[k] || 0) + d); if (!S.qty[k]) delete S.qty[k]; saveDraft(); renderObj(); }
 function allZero() { S.qty = {}; saveDraft(); renderObj(); }
@@ -209,16 +314,25 @@ async function post(payload) {
 }
 async function send() {
   const o = S.cur, note = $('note').value.trim();
-  const rows = Object.keys(S.qty).map(k => { const [cat, art] = k.split('|'); return { obekt: o, cat, art, qty: S.qty[k], note: '' }; });
+  const b = basis(o), B = b.sum;
+  if (b.today && S.todayIn[o] === undefined) { toast('Отговори дали днешната доставка е заредена', true); return; }
+  // Всеки зареден артикул се записва — и с остатък 0 (значи всичко е продадено).
+  const keys = [...new Set([...Object.keys(B), ...Object.keys(S.qty)])];
+  const src = [b.prev, b.today && S.todayIn[o] ? b.today : null].filter(Boolean).map(d => d.slice(0, 5)).join('+');
+  const rows = keys.map(k => {
+    const [cat, art] = k.split('|'), q = S.qty[k] || 0, bq = B[k] || 0;
+    return { obekt: o, cat, art, qty: q, note: bq ? `заредено ${bq} (${src}) · продадено ${Math.max(0, bq - q)}` : '' };
+  });
   // „Няма остатъци“ също е информация — записва се като ред с 0, за да знае Мони, че обектът е проверен.
   if (!rows.length) rows.push({ obekt: o, cat: '', art: 'Няма остатъци', qty: 0, note: '' });
-  if (note) rows[0].note = note;
+  if (note) rows[0].note = (rows[0].note ? rows[0].note + ' · ' : '') + note;
   const payload = { date: todayBg(), source: 'Обход (приложение)', rows };
   const total = rows.reduce((s, r) => s + r.qty, 0);
+  const soldTot = keys.reduce((s, k) => s + Math.max(0, (B[k] || 0) - (S.qty[k] || 0)), 0);
   $('sendBtn').disabled = true;
   try {
     await post(payload);
-    toast('✓ Изпратено: ' + shortName(o));
+    toast('✓ Изпратено: ' + shortName(o) + (Object.keys(B).length ? ' · продадено ' + soldTot : ''));
   } catch (e) {
     const q = ls('obhod_queue') || []; q.push(payload); ls('obhod_queue', q);
     toast('Няма връзка — ще се изпрати автоматично', true);

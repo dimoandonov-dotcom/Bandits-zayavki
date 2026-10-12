@@ -986,7 +986,7 @@ function collectOrderRows() {
       cat.items.forEach(it => {
         p.objects.forEach(obj => {
           const q = Number(it.qtys[obj]) || 0;
-          if (q > 0) rows.push({ obekt: obj, art: it.name, cat: cat.name, qty: q });
+          if (q > 0) rows.push({ obekt: obj, art: it.name, cat: cat.name, qty: q, sheet: sn });  // sheet: за да се различат еднакви имена в различни вериги (Обход)
         });
       });
     });
