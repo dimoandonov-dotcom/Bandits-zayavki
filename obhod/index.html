@@ -112,6 +112,7 @@ const CATS = [
   ['Крейзи',    ['Луканка','Шунка','Шпек','Пиле']],
   ['Багети',    ['Шунка','Пиле','Шпек салам','Луканка']],
   ['Десерти',   ['Еклер','Чийз кейк','Гранола','Тирамису','Профитерол','Торта Домашна','Шоколадова торта']],
+  ['Закуски',   ['Рогче','Баница','Кренвиршка','Милинка']],
 ];
 function mergeCats(pairs) {   // pairs: ['Категория|Артикул', ...] от заявките
   pairs.forEach(k => {
@@ -177,7 +178,33 @@ function resolveOrder(rows) {
 
 // Последната заявка за всеки ден от седмицата (апито дава „предната заявка за същия ден“,
 // затова питаме за датата след 7 дни). Пазим доставките от последните 7 дни, вкл. днес.
+// Първо: реално доставеното по стоковите от регистъра (вкл. закуските от ВЕГА).
+// Стоковата е с датата на производството → в обекта е от следващия ден (неделя → понеделник).
+async function loadDeliveries() {
+  const r = await fetch(API + '?action=getDeliveries&days=9').then(x => x.json());
+  if (!r || !r.ok) return null;
+  const today = parseBg(todayBg()), from = new Date(today); from.setDate(from.getDate() - 6);
+  const orders = {};
+  Object.entries(r.rows || {}).forEach(([obj, days]) => Object.entries(days).forEach(([ds, arts]) => {
+    const d = parseBg(ds); if (!d) return;
+    d.setDate(d.getDate() + 1); if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    if (d < from || d > today) return;
+    const key = fmtBg(d), o = (orders[obj] = orders[obj] || {}), day = (o[key] = o[key] || {});
+    Object.entries(arts).forEach(([k, q]) => day[k] = (day[k] || 0) + q);
+  }));
+  return orders;
+}
 async function loadOrders() {
+  try {
+    const dl = await loadDeliveries();
+    if (dl) {
+      S.orders = dl; S.src = 'стокови'; ls('obhod_orders', { date: todayBg(), orders: dl, src: S.src });
+      Object.values(dl).forEach(o => Object.values(o).forEach(day => mergeCats(Object.keys(day))));
+      if (S.cur) renderObj();
+      return;
+    }
+  } catch (e) { /* старо апи без getDeliveries — продължаваме със заявките */ }
+  S.src = 'заявки';
   const today = parseBg(todayBg()), from = new Date(today); from.setDate(from.getDate() - 6);
   const asks = [];
   for (let i = 0; i < 7; i++) {
@@ -226,7 +253,7 @@ async function load() {
     const r = await fetch(API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
     if (r && r.ok) { apply(r.rows); ls('obhod_cache', r.rows); }
   } catch (e) { if (!cache) $('list').innerHTML = '<div class="empty">Няма интернет. Опитай пак след малко.</div>'; }
-  const oc = ls('obhod_orders'); if (oc && oc.date === todayBg()) { S.orders = oc.orders || {}; Object.values(S.orders).forEach(o => Object.values(o).forEach(day => mergeCats(Object.keys(day)))); }
+  const oc = ls('obhod_orders'); if (oc && oc.date === todayBg()) { S.src = oc.src || 'заявки'; S.orders = oc.orders || {}; Object.values(S.orders).forEach(o => Object.values(o).forEach(day => mergeCats(Object.keys(day)))); }
   const ti = ls('obhod_todayin'); if (ti && ti.date === todayBg()) S.todayIn = ti.objs || {};
   loadOrders().catch(() => {});
   flushQueue();
@@ -277,7 +304,7 @@ function renderDl() {
   const tot = d => Object.values(ord[d] || {}).reduce((s, v) => s + v, 0);
   if (!b.prev && !b.today) { el.hidden = false; el.innerHTML = '<span>Няма заявка за този обект през последните 7 дни.</span>'; return; }
   let h = '';
-  if (b.prev) h += `<div>Последна доставка: <b>${dayLbl(b.prev)}</b> · ${tot(b.prev)} бр.</div>`;
+  if (b.prev) h += `<div>Последна доставка: <b>${dayLbl(b.prev)}</b> · ${tot(b.prev)} бр. <span style="color:var(--muted);font-size:12px">(по ${S.src || 'заявки'})</span></div>`;
   if (b.today) h += `<div class="ask"><span>Днешната доставка (<b>${tot(b.today)} бр.</b>) заредена ли е вече?</span>
       <button class="yn ${S.todayIn[S.cur] === true ? 'on' : ''}" onclick="setTodayIn(true)">Да</button>
       <button class="yn ${S.todayIn[S.cur] === false ? 'on' : ''}" onclick="setTodayIn(false)">Не</button></div>`;
