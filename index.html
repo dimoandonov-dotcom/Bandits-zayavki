@@ -141,6 +141,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .spin{width:44px;height:44px;border:3px solid #2c3347;border-top-color:#f5a623;border-radius:50%;animation:sp .8s linear infinite;margin-bottom:12px}
 @keyframes sp{to{transform:rotate(360deg)}}
   .qhint{font-size:10px;color:#8a94a6;font-weight:400;margin-top:1px;}
+  .qhint.hot{color:#ff8a80;font-weight:700}
+  .sugg-btn{background:#3a1d1d;color:#ff8a80;border:1px solid #ef5350;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px}
+  .obj-warn{font-size:11px;font-weight:700;color:#ff8a80;margin-left:8px}
+  .btn-ret{background:#ef5350;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer}
+  #retModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;overflow:auto;padding:16px}
+  #retModal.show{display:block}
+  .ret-box{background:#1b1f2b;border:1px solid #2c3347;border-radius:12px;max-width:640px;margin:0 auto;padding:14px;color:#e8eaf0;font-family:-apple-system,sans-serif}
+  .ret-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #2c3347;font-size:13px}
+  .ret-row .r-n{flex:1}.ret-row .r-p{color:#ff8a80;font-weight:700;white-space:nowrap}
   .btn-prev{background:#f0a32a;color:#12151b;border:none;border-radius:8px;padding:8px 14px;
     font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
   .btn-prev:hover{filter:brightness(1.08);}
@@ -198,6 +207,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </select>
       <button class="btn-prev" onclick="autoLoadPreviousOrder(true)"
         title="Попълва количествата от предната заявка за същия ден">📋 Предната заявка</button>
+      <button class="btn-ret" onclick="openRetModal()" title="Артикули с високо връщане за последните 4 седмици">⚠️ Връщания</button>
     </div>
   </div>
 
@@ -230,6 +240,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="bbtn bbtn-pri" onclick="openPrintModal()">🖨️ ПЕЧАТ & ЗАПАЗИ</button>
   </div>
 </div>
+
+<!-- RETURNS MODAL -->
+<div id="retModal" onclick="if(event.target===this)closeRetModal()"><div class="ret-box" id="retBox"></div></div>
 
 <!-- PRINT MODAL -->
 <div id="printModal">
@@ -530,6 +543,7 @@ function showApp() {
   renderTabs();
   renderObjList();
   autoSave();
+  loadReturnStats();
 }
 
 // On page load - показваме архива (start screen)
@@ -795,7 +809,7 @@ function renderObjList() {
   document.getElementById('objList').innerHTML = d.objects.map(obj=>{
     const tot=getObjTotal(curDistrict,obj);
     return `<button class="obj-btn ${tot>0?'has-data':''}" onclick="openObj('${curDistrict.replace(/'/g,"\\'")}','${obj.replace(/'/g,"\\'")}')">
-      <span class="obj-name">${obj}</span>
+      <span class="obj-name">${obj}${objWarn(curDistrict,obj)}</span>
       <span class="obj-badge">${tot}</span>
     </button>`;
   }).join('');
@@ -1085,14 +1099,106 @@ async function autoLoadPreviousOrder(manual) {
   }
 }
 // Малка подсказка под полето за количество: предна стойност + % връщане, ако е надежден.
+// При високо връщане (≥ RET_LIMIT %) — червено + предложено количество с бутон „приложи“.
+const RET_LIMIT = 30;
+function suggestQty(prev, pct) {
+  // очаквано продадено = заявено × (1 − %връщане), + 1 бр. резерв
+  return Math.max(0, Math.round(prev * (1 - pct / 100)) + 1);
+}
+function retInfo(cat, item, obj) {
+  const st = RETURN_STATS[obj + '|' + cat + '|' + item.name];
+  if (!st || st.pct === null || st.pct === undefined) return null;
+  const cur = Number(item.qtys[obj]) || 0;
+  const base = Number(item.origQtys[obj]) || cur;   // от предната заявка, за да не се намалява двойно
+  const hot = st.pct >= RET_LIMIT && cur > 0;
+  const sugg = hot ? suggestQty(base, st.pct) : null;
+  return { st, cur, hot, sugg: (sugg !== null && sugg < cur) ? sugg : null };
+}
 function prevHint(cat, item, obj) {
-  const key = obj + '|' + cat + '|' + item.name;
-  const st = RETURN_STATS[key];
   const prev = item.origQtys[obj];
+  const ri = retInfo(cat, item, obj);
   const parts = [];
   if (prev) parts.push('пред: ' + prev);
-  if (st && st.pct !== null && st.pct !== undefined) parts.push('връща ' + st.pct + '%');
-  return parts.length ? `<div class="qhint">${parts.join(' · ')}</div>` : '';
+  if (ri) parts.push('връща ' + ri.st.pct + '% (' + ri.st.returned + '/' + ri.st.delivered + ')');
+  if (!parts.length) return '';
+  let btn = '';
+  if (ri && ri.sugg !== null) {
+    const d = WB[curDistrict], ci = d.categories.findIndex(c => c.name === cat),
+          ii = ci >= 0 ? d.categories[ci].items.indexOf(item) : -1;
+    if (ii >= 0) btn = ` <button class="sugg-btn" onclick="applySugg(${ci},${ii},${ri.sugg})">→ ${ri.sugg} приложи</button>`;
+  }
+  return `<div class="qhint${ri && ri.hot ? ' hot' : ''}">${parts.join(' · ')}${btn}</div>`;
+}
+function applySugg(ci, ii, q) {
+  const el = document.getElementById('inp_' + ci + '_' + ii);
+  if (el) { el.value = q; setQ(ci, ii, q, el); }
+  renderEditObj();
+  toast('✓ Количеството е коригирано на ' + q);
+}
+// Колко артикула с високо връщане има обектът (за знак в списъка с обекти)
+function objWarn(dist, obj) {
+  const d = WB[dist]; if (!d) return '';
+  let n = 0;
+  d.categories.forEach(cat => cat.items.forEach(it => { const r = retInfo(cat.name, it, obj); if (r && r.hot) n++; }));
+  return n ? `<span class="obj-warn">⚠️ ${n}</span>` : '';
+}
+// Зарежда статистиката за връщанията и без дата (при отваряне на заявката)
+let RET_LOADED = false;
+async function loadReturnStats() {
+  if (RET_LOADED) return;
+  try {
+    const r = await fetch(ZAYAVKI_API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
+    if (r && r.ok) { RETURN_STATS = r.rows || {}; RET_LOADED = true; renderObjList(); if (curObj) renderEditObj(); }
+  } catch (e) { console.warn('Статистика за връщания — неуспешно:', e); }
+}
+// Списък на всички обекти/артикули с високо връщане в текущата заявка
+function collectHot() {
+  const out = [];
+  sheets.forEach(sn => {
+    const d = WB[sn]; if (!d) return;
+    d.categories.forEach((cat, ci) => cat.items.forEach((it, ii) => d.objects.forEach(obj => {
+      const r = retInfo(cat.name, it, obj);
+      if (r && r.hot) out.push({ sn, obj, cat: cat.name, ci, ii, name: it.name, ...r });
+    })));
+  });
+  return out.sort((a, b) => b.st.returned - a.st.returned);
+}
+async function openRetModal() {
+  if (!RET_LOADED) { toast('Зареждам статистиката...'); await loadReturnStats(); }
+  const hot = collectHot();
+  const withSugg = hot.filter(h => h.sugg !== null);
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="font-size:15px">⚠️ Високо връщане (≥${RET_LIMIT}%, последни 4 седмици)</b>
+      <button onclick="closeRetModal()" class="btn-hdr">✕</button></div>`;
+  if (!RET_LOADED) html += '<div style="color:#ff8a80">Няма връзка с апито — опитай пак.</div>';
+  else if (!hot.length) html += '<div style="color:#66bb6a">Няма артикули с високо връщане в тази заявка 👍</div>';
+  else {
+    html += `<div style="font-size:12px;color:#8a94a6;margin-bottom:6px">Предложение = заявено × (1 − %връщане) + 1 резерв. Нищо не се сменя, докато не натиснеш.</div>`;
+    hot.forEach((h, k) => {
+      html += `<div class="ret-row"><span class="r-n"><b>${h.obj}</b><br>${h.cat} · ${h.name}</span>
+        <span class="r-p">${h.st.pct}% (${h.st.returned}/${h.st.delivered})</span>
+        <span style="white-space:nowrap">${h.cur}${h.sugg !== null ? ` → <b>${h.sugg}</b> <button class="sugg-btn" onclick="applyHot(${k})">приложи</button>` : ''}</span></div>`;
+    });
+    if (withSugg.length) html += `<button class="btn-ret" style="width:100%;margin-top:12px;padding:12px" onclick="applyAllHot()">✓ Приложи всички ${withSugg.length} предложения</button>`;
+  }
+  window._HOT = hot;
+  document.getElementById('retBox').innerHTML = html;
+  document.getElementById('retModal').classList.add('show');
+}
+function closeRetModal() { document.getElementById('retModal').classList.remove('show'); }
+function setHotQty(h) {
+  const it = WB[h.sn].categories[h.ci].items[h.ii];
+  it.qtys[h.obj] = h.sugg;
+}
+function applyHot(k) {
+  const h = (window._HOT || [])[k]; if (!h || h.sugg === null) return;
+  setHotQty(h); autoSave(); renderObjList(); if (curObj) renderEditObj(); openRetModal();
+  toast('✓ ' + h.obj + ' · ' + h.name + ' → ' + h.sugg);
+}
+function applyAllHot() {
+  const hot = (window._HOT || []).filter(h => h.sugg !== null);
+  hot.forEach(setHotQty); autoSave(); renderObjList(); if (curObj) renderEditObj(); openRetModal();
+  toast('✓ Приложени ' + hot.length + ' корекции');
 }
 
 // ===== GENERATE EXCEL (ExcelJS - with formatting, print setup, bold) =====
