@@ -20,6 +20,7 @@
   --fg:#5b3a40; --muted:#a6838a;
   --rose:#c9909a; --rose2:#e7b9bf; --deep:#8f5562; --blush:#f6d5d8;
   --ok:#7fae93; --okbg:#e6f2ea; --warn:#c96b78;
+  --choc:#6e4038; --choc2:#9b6355; --cream:#fff4ec; --pink:#f2a7b5; --mint:#bfe3d2;
   --sh:0 8px 24px rgba(143,85,98,.14), 0 2px 6px rgba(143,85,98,.08);
   --f-d:'Cormorant Garamond', Georgia, serif; --f-b:'Nunito', -apple-system, 'Segoe UI', sans-serif;
   color-scheme:light}
@@ -27,7 +28,9 @@
 html{background:var(--bg)}
 body{font-family:var(--f-b);color:var(--fg);min-height:100vh;overscroll-behavior:none;
   background:radial-gradient(120% 60% at 100% 0%, #f9e3e6 0%, transparent 60%),
-             radial-gradient(90% 50% at 0% 100%, #f3e0dc 0%, transparent 60%), var(--bg)}
+             radial-gradient(90% 50% at 0% 100%, #f3e0dc 0%, transparent 60%),
+             radial-gradient(circle at 12px 12px, rgba(242,167,181,.22) 2.5px, transparent 3px) 0 0/34px 34px,
+             radial-gradient(circle at 29px 29px, rgba(155,99,85,.10) 2px, transparent 2.5px) 0 0/34px 34px, var(--bg)}
 button{font-family:inherit;color:inherit}
 /* падащи листенца */
 #petals{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
@@ -39,8 +42,17 @@ button{font-family:inherit;color:inherit}
 .hdr{position:sticky;top:0;z-index:50;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;
   background:linear-gradient(180deg,rgba(255,250,249,.92),rgba(255,250,249,.80));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);box-shadow:0 6px 20px rgba(143,85,98,.06)}
+.hdr::after{content:"";position:absolute;left:0;right:0;bottom:-15px;height:16px;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0 0h120v4c-6 0-6 9-11 9s-4-7-9-7-5 10-11 10-5-8-10-8-6 5-11 5-5-9-10-9-5 11-11 11-6-8-11-8-5 5-10 5S6 4 0 4z' fill='%236e4038'/%3E%3C/svg%3E") repeat-x 0 0/240px 16px;
+  animation:drip 9s ease-in-out infinite alternate}
+@keyframes drip{to{background-position:240px 0}}
+.hdr{border-bottom:3px solid var(--choc)!important}
 .hrow{display:flex;align-items:center;gap:12px}
 .ava{position:relative;width:54px;height:54px;flex:none}
+.ava{animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-3px) rotate(-2deg)}}
+.ava::after{content:"♥";position:absolute;right:-4px;bottom:-2px;z-index:2;font-size:15px;color:#fff;background:var(--choc);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;box-shadow:0 2px 6px rgba(110,64,56,.4);animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.15)}}
 .ava img{width:100%;height:100%;object-fit:cover;border-radius:50%;border:3px solid #fff;box-shadow:var(--sh);position:relative;z-index:1}
 .ava::before{content:"";position:absolute;inset:-4px;border-radius:50%;
   background:conic-gradient(from 0deg,var(--rose2),var(--deep),var(--blush),var(--rose),var(--rose2));animation:spin 8s linear infinite}
@@ -50,7 +62,10 @@ button{font-family:inherit;color:inherit}
 .ttl i{font-style:italic;color:var(--rose)}
 .sub{font-size:12.5px;color:var(--muted);margin-top:2px;font-weight:700}
 .prog{height:6px;border-radius:6px;background:var(--bg2);margin-top:7px;overflow:hidden}
-.prog span{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--rose2),var(--deep));transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.prog{height:9px!important;border:1px solid var(--line)}
+.prog span{display:block;height:100%;width:0;border-radius:6px;transition:width .8s cubic-bezier(.2,.8,.2,1);
+  background:repeating-linear-gradient(-45deg,var(--pink) 0 6px,#fff 6px 12px);background-size:17px 17px;animation:stripes 1s linear infinite}
+@keyframes stripes{to{background-position:17px 0}}
 .pill{font-size:12px;font-weight:800;border-radius:20px;padding:6px 10px;background:var(--blush);color:var(--deep);white-space:nowrap}
 .pill.warn{background:#f8dfe2;color:var(--warn)}
 /* вериги и търсене */
@@ -59,7 +74,7 @@ button{font-family:inherit;color:inherit}
 .tab{font-size:14px;font-weight:800;padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);white-space:nowrap;cursor:pointer;
   box-shadow:0 2px 6px rgba(143,85,98,.06);transition:transform .2s,background .3s,color .3s}
 .tab:active{transform:scale(.94)}
-.tab.on{background:linear-gradient(135deg,var(--rose),var(--deep));border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(143,85,98,.30)}
+.tab.on{animation:jelly .5s;background:linear-gradient(135deg,var(--rose),var(--deep));border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(143,85,98,.30)}
 .search{margin:12px 16px 0;width:calc(100% - 32px);background:var(--card);border:1px solid var(--line);border-radius:16px;color:var(--fg);font-size:16px;padding:13px 16px;outline:none;font-family:inherit;box-shadow:inset 0 1px 3px rgba(143,85,98,.06);transition:border-color .2s,box-shadow .2s}
 .search:focus{border-color:var(--rose);box-shadow:0 0 0 4px rgba(201,144,154,.18)}
 .search::placeholder{color:#c3a5aa}
@@ -71,6 +86,21 @@ button{font-family:inherit;color:inherit}
 .obj.done{background:linear-gradient(135deg,#fffaf9 60%,var(--okbg))}
 .obj.done::after{content:"✿";color:var(--ok);font-size:18px}
 .obj small{font-size:12px;font-weight:800;color:var(--ok);margin-left:auto}
+@keyframes jelly{0%{transform:scale(1)}30%{transform:scale(1.15,.85)}50%{transform:scale(.92,1.08)}70%{transform:scale(1.04,.96)}100%{transform:scale(1)}}
+.obj:active{animation:jelly .4s}
+.obj.done::before{content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;
+  background:radial-gradient(circle at 20% 30%,var(--pink) 1.5px,transparent 2px),radial-gradient(circle at 70% 60%,var(--mint) 1.5px,transparent 2px),radial-gradient(circle at 45% 80%,var(--choc2) 1.5px,transparent 2px),radial-gradient(circle at 88% 25%,var(--pink) 1.5px,transparent 2px);opacity:.8}
+.obj{position:relative}
+/* сладка мисъл */
+.quote{margin:14px 16px 0;padding:16px 18px 24px 58px;border-radius:22px;position:relative;cursor:pointer;color:var(--cream);overflow:hidden;
+  background:linear-gradient(135deg,#7c4a40,var(--choc) 55%,#5a322b);box-shadow:0 10px 26px rgba(110,64,56,.35);min-height:86px;display:flex;align-items:center}
+.quote::before{content:"";position:absolute;left:14px;top:50%;width:32px;height:32px;margin-top:-16px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 30'%3E%3Cpath d='M16 29C-6 14 4-4 16 7 28-4 38 14 16 29Z' fill='%23f2a7b5'/%3E%3C/svg%3E") center/contain no-repeat;animation:beat 1.8s ease-in-out infinite}
+.quote::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.12) 50%,transparent 65%);transform:translateX(-100%);animation:shine 5s ease-in-out infinite}
+.quote p{font-family:var(--f-d);font-style:italic;font-size:19px;line-height:1.3;transition:opacity .5s,transform .5s}
+.quote p.out{opacity:0;transform:translateY(8px)}
+.quote small{position:absolute;right:14px;bottom:6px;font-size:10px;opacity:.55;font-weight:800;letter-spacing:.5px}
+.candy{position:absolute;top:-40px;background:center/contain no-repeat;animation:fall linear infinite;opacity:.75}
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 /* екран на обекта */
 #objView{display:none;padding-bottom:120px}
@@ -144,6 +174,7 @@ button{font-family:inherit;color:inherit}
 </div>
 
 <div id="home">
+  <div class="quote" id="quote" onclick="nextQuote()"><p id="qtext">Сладка мисъл за теб…</p><small>докосни за следваща</small></div>
   <div class="tabs" id="tabs"></div>
   <input class="search" id="q" type="search" placeholder="Търси обект…" autocomplete="off">
   <div id="list"><div class="empty">Зареждам обектите…</div></div>
@@ -163,6 +194,7 @@ button{font-family:inherit;color:inherit}
 
 <div class="toast" id="toast"></div>
 
+<script src="quotes.js"></script>
 <script>
 // ===== ВРЪЗКА С АПИТО ЗА ЗАЯВКИ (същото като в приложението на Мони) =====
 // Остатъците отиват в лист „ОСТАТЪЦИ“ и Мони ги вижда до всеки артикул, когато прави заявката.
@@ -458,6 +490,11 @@ async function send() {
     await post(payload);
     toast('✿ Изпратено: ' + shortName(o) + (Object.keys(B).length ? ' · продадено ' + soldTot : ''));
     petalBurst($('sendBtn'));
+    nextQuote();
+    setTimeout(() => {   // цялата верига е мината → голям сладък празник
+      const ch = S.objects.filter(x => chainOf(x) === chainOf(o));
+      if (ch.length && ch.every(x => S.sent[x])) { toast('🍫 Всички обекти в ' + chainOf(o) + ' са минати! Браво, Белла!'); for (let k = 0; k < 3; k++) setTimeout(() => petalBurst($('quote')), k * 350); }
+    }, 1200);
   } catch (e) {
     const q = ls('obhod_queue') || []; q.push(payload); ls('obhod_queue', q);
     toast('Няма връзка — ще се изпрати автоматично', true);
@@ -490,13 +527,45 @@ window.addEventListener('online', flushQueue);
     box.appendChild(p);
   }
 })();
+const CANDIES = [
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 20'><path d='M9 10 0 3v14z' fill='#f2a7b5'/><path d='M31 10 40 3v14z' fill='#f2a7b5'/><ellipse cx='20' cy='10' rx='12' ry='8' fill='#e27d93'/><path d='M15 4q5 6 0 12' stroke='#fff' stroke-width='2' fill='none' opacity='.6'/></svg>",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 30'><path d='M16 29C-6 14 4-4 16 7 28-4 38 14 16 29Z' fill='#6e4038'/><path d='M8 9q3-4 7 0' stroke='#a0675a' stroke-width='2' fill='none'/></svg>",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 26'><rect x='1' y='1' width='32' height='10' rx='5' fill='#f6c1cc'/><rect x='3' y='10' width='28' height='6' rx='3' fill='#fff4ec'/><rect x='1' y='15' width='32' height='10' rx='5' fill='#f6c1cc'/></svg>",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><rect x='1' y='1' width='28' height='28' rx='4' fill='#7a4a40'/><rect x='5' y='5' width='9' height='9' rx='2' fill='#8d5a4f'/><rect x='16' y='5' width='9' height='9' rx='2' fill='#8d5a4f'/><rect x='5' y='16' width='9' height='9' rx='2' fill='#8d5a4f'/><rect x='16' y='16' width='9' height='9' rx='2' fill='#8d5a4f'/></svg>",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><circle cx='15' cy='15' r='13' fill='#5a322b'/><path d='M8 10l2 1M18 8l2 2M12 19l2-1M20 17l1 2M9 15l2 0' stroke='#f2a7b5' stroke-width='2' stroke-linecap='round'/></svg>",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><circle cx='15' cy='15' r='13' fill='#fff'/><path d='M15 2a13 13 0 0 1 0 26' fill='#f2a7b5'/><circle cx='15' cy='15' r='5' fill='#e27d93'/></svg>"
+].map(s => 'url("data:image/svg+xml,' + encodeURIComponent(s) + '")');
+(function candies() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box = $('petals');
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('span'); c.className = 'candy';
+    const sz = 16 + Math.random() * 12;
+    c.style.cssText = `left:${Math.random() * 96}%;width:${sz}px;height:${sz}px;background-image:${CANDIES[i % CANDIES.length]};animation-duration:${16 + Math.random() * 16}s;animation-delay:${-Math.random() * 25}s`;
+    box.appendChild(c);
+  }
+})();
+// ---- сладки мисли: всяка се показва веднъж, после започват отначало ----
+function nextQuote() {
+  if (typeof QUOTES === 'undefined') return;
+  let order = ls('obhod_qorder'), pos = ls('obhod_qpos') || 0;
+  if (!order || order.length !== QUOTES.length) { order = QUOTES.map((_, i) => i).sort(() => Math.random() - .5); pos = 0; ls('obhod_qorder', order); }
+  if (pos >= order.length) pos = 0;
+  const t = QUOTES[order[pos]]; ls('obhod_qpos', pos + 1);
+  const p = $('qtext'); p.classList.add('out');
+  setTimeout(() => { p.textContent = t; p.classList.remove('out'); }, 450);
+  clearTimeout(nextQuote._t); nextQuote._t = setTimeout(nextQuote, 16000);
+  return t;
+}
+nextQuote();
 function petalBurst(from) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const r = from.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top;
   for (let i = 0; i < 22; i++) {
     const p = document.createElement('span'); p.className = 'burst';
+    if (i % 3 === 0) { p.style.background = CANDIES[i % CANDIES.length] + ' center/contain no-repeat'; p.style.width = p.style.height = '22px'; }
     const a = Math.PI * (1 + Math.random()), d = 80 + Math.random() * 170;
-    p.style.cssText = `left:${x}px;top:${y}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 40}px;--r:${Math.random() * 540 - 270}deg;animation-delay:${Math.random() * 120}ms`;
+    p.style.cssText += `;left:${x}px;top:${y}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 40}px;--r:${Math.random() * 540 - 270}deg;animation-delay:${Math.random() * 120}ms`;
     document.body.appendChild(p); setTimeout(() => p.remove(), 1600);
   }
 }
