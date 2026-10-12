@@ -1067,7 +1067,7 @@ async function autoLoadPreviousOrder(manual) {
       fetch(ZAYAVKI_API + '?action=getPreviousOrder&date=' + encodeURIComponent(delVal)).then(r=>r.json()),
       fetch(ZAYAVKI_API + '?action=getReturnStatsForMony&weeks=4').then(r=>r.json()),
     ]);
-    if (statsRes && statsRes.ok) RETURN_STATS = statsRes.rows || {};
+    if (statsRes && statsRes.ok) { RETURN_STATS = statsRes.rows || {}; rebuildRegObjs(); }
 
     if (!prevRes || !prevRes.ok || !prevRes.found) {
       PREV_ORDER_LOADED_FOR = delVal;
@@ -1105,8 +1105,45 @@ function suggestQty(prev, pct) {
   // очаквано продадено = заявено × (1 − %връщане), + 1 бр. резерв
   return Math.max(0, Math.round(prev * (1 - pct / 100)) + 1);
 }
-function retInfo(cat, item, obj) {
-  const key = obj + '|' + cat + '|' + item.name;
+// Имената на обектите в заявката („Владислав“) и в регистъра („300 ВЛАДИСЛАВ“) се различават.
+// Тук се свързват: точно съвпадение → без префикса на веригата (300/СИТИ/СТАР/АБЦ) →
+// при двама кандидати (напр. Македония в 300 и в СТАР) се гледа към коя верига са
+// останалите обекти в същия лист на заявката.
+const RET_CHAINS = ['300', 'СИТИ', 'СТАР', 'АБЦ'];
+function nObj(s) { return String(s || '').toUpperCase().replace(/[.+]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function chainW(r) { const w = nObj(r).split(' ')[0]; return RET_CHAINS.includes(w) ? w : ''; }
+function baseObj(r) { let n = nObj(r); const c = chainW(r); if (c) n = n.slice(c.length).trim(); return n.replace(/^ДЕТ /, ''); }
+let REG_OBJS = [], REG_CACHE = {};
+function rebuildRegObjs() {
+  const set = new Set();
+  [RETURN_STATS, LEFTOVERS].forEach(o => Object.keys(o || {}).forEach(k => set.add(k.split('|')[0])));
+  REG_OBJS = [...set]; REG_CACHE = {};
+}
+function regCands(obj) {
+  const n = nObj(obj), b = baseObj(obj);
+  const exact = REG_OBJS.filter(r => nObj(r) === n);
+  return exact.length ? exact : REG_OBJS.filter(r => baseObj(r) === b);
+}
+function sheetChain(sn) {
+  const up = nObj(sn);
+  const named = RET_CHAINS.find(c => up.split(' ').includes(c));
+  if (named) return named;
+  const d = WB[sn]; if (!d) return '';
+  const cnt = {};
+  d.objects.forEach(o => { const c = regCands(o); if (c.length === 1) { const w = chainW(c[0]); cnt[w] = (cnt[w] || 0) + 1; } });
+  return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || '';
+}
+function regName(sn, obj) {
+  const ck = sn + '¦' + obj;
+  if (ck in REG_CACHE) return REG_CACHE[ck];
+  const c = regCands(obj);
+  let r = c.length === 1 ? c[0] : null;
+  if (c.length > 1) { const ch = sheetChain(sn); const m = c.filter(x => chainW(x) === ch); r = m.length === 1 ? m[0] : null; }
+  return (REG_CACHE[ck] = r);
+}
+function retInfo(cat, item, obj, sn) {
+  const reg = regName(sn || curDistrict, obj) || obj;
+  const key = reg + '|' + cat + '|' + item.name;
   const st0 = RETURN_STATS[key];
   const st = (st0 && st0.pct !== null && st0.pct !== undefined) ? st0 : null;
   const lo = LEFTOVERS[key] || null;                 // остатък от обхода (Viber)
@@ -1151,7 +1188,7 @@ function applySugg(ci, ii, q) {
 function objWarn(dist, obj) {
   const d = WB[dist]; if (!d) return '';
   let n = 0;
-  d.categories.forEach(cat => cat.items.forEach(it => { const r = retInfo(cat.name, it, obj); if (r && r.hot) n++; }));
+  d.categories.forEach(cat => cat.items.forEach(it => { const r = retInfo(cat.name, it, obj, dist); if (r && r.hot) n++; }));
   return n ? `<span class="obj-warn">⚠️ ${n}</span>` : '';
 }
 // Зарежда статистиката за връщанията и без дата (при отваряне на заявката)
@@ -1161,11 +1198,11 @@ async function loadReturnStats() {
   if (RET_LOADED) return;
   // остатъците са по желание — ако апито още не ги поддържа, просто ги няма
   fetch(ZAYAVKI_API + '?action=getLeftovers&days=2').then(x => x.json())
-    .then(r => { if (r && r.ok) { LEFTOVERS = r.rows || {}; renderObjList(); if (curObj) renderEditObj(); } })
+    .then(r => { if (r && r.ok) { LEFTOVERS = r.rows || {}; rebuildRegObjs(); renderObjList(); if (curObj) renderEditObj(); } })
     .catch(() => {});
   try {
     const r = await fetch(ZAYAVKI_API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
-    if (r && r.ok) { RETURN_STATS = r.rows || {}; RET_LOADED = true; renderObjList(); if (curObj) renderEditObj(); }
+    if (r && r.ok) { RETURN_STATS = r.rows || {}; RET_LOADED = true; rebuildRegObjs(); renderObjList(); if (curObj) renderEditObj(); }
   } catch (e) { console.warn('Статистика за връщания — неуспешно:', e); }
 }
 // Списък на всички обекти/артикули с високо връщане в текущата заявка
@@ -1174,7 +1211,7 @@ function collectHot() {
   sheets.forEach(sn => {
     const d = WB[sn]; if (!d) return;
     d.categories.forEach((cat, ci) => cat.items.forEach((it, ii) => d.objects.forEach(obj => {
-      const r = retInfo(cat.name, it, obj);
+      const r = retInfo(cat.name, it, obj, sn);
       if (r && r.hot) out.push({ sn, obj, cat: cat.name, ci, ii, name: it.name, ...r });
     })));
   });

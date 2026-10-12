@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bandits Обход</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Обход">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="../icon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+/* Същият вид като приложението на Мони (тъмно + оранжево), но с големи бутони за пръст в магазина */
+:root{--bg:#0f1117;--card:#1b1f2b;--line:#2c3347;--fg:#e8eaf0;--muted:#8a94a6;--accent:#f5a623;--ok:#66bb6a;--warn:#ff8a80;color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overscroll-behavior:none}
+button{font-family:inherit}
+.hdr{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ttl{font-size:18px;font-weight:900;letter-spacing:2px;color:var(--accent)}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pill{font-size:12px;font-weight:700;border-radius:20px;padding:5px 10px;background:#242838;color:var(--muted);white-space:nowrap}
+.pill.warn{background:#3a1d1d;color:var(--warn)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.tab{font-size:13px;font-weight:700;padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--muted);white-space:nowrap;cursor:pointer}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#111}
+.search{margin:10px 14px 0;width:calc(100% - 28px);background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--fg);font-size:16px;padding:11px 12px;outline:none}
+.search:focus{border-color:var(--accent)}
+#list{padding:10px 14px 40px;display:grid;gap:6px}
+.obj{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:14px;font-size:16px;font-weight:700;color:var(--fg);text-align:left;cursor:pointer;width:100%}
+.obj.done{border-left-color:var(--ok)}
+.obj small{font-size:12px;font-weight:600;color:var(--ok)}
+.obj small.q{color:var(--accent)}
+/* Екран на обекта */
+#objView{display:none;padding-bottom:110px}
+#objView.show{display:block}
+.ohdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:var(--hdrH,58px);z-index:40}
+.back{background:#242838;border:0;color:var(--fg);font-weight:700;font-size:14px;border-radius:8px;padding:9px 12px;cursor:pointer}
+.oname{font-size:17px;font-weight:900;color:var(--accent);flex:1;min-width:0}
+.cat{margin:12px 14px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cath{display:flex;justify-content:space-between;padding:10px 14px;background:#242838;font-weight:800;font-size:14px;color:var(--accent)}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.nm{flex:1;min-width:0;font-size:16px;font-weight:600}
+.nm .h{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.qw{display:flex;align-items:center;gap:6px}
+.qb{width:48px;height:48px;border-radius:12px;border:1px solid var(--line);background:#242838;color:var(--fg);font-size:24px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.qb:active{background:var(--accent);color:#111}
+.qv{width:44px;text-align:center;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted)}
+.qv.has{color:var(--accent)}
+.more{margin:12px 14px 0;width:calc(100% - 28px);background:transparent;border:1px dashed var(--line);color:var(--muted);border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
+.note{margin:12px 14px 0;width:calc(100% - 28px);background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--fg);font-size:15px;padding:11px 12px;min-height:60px;resize:vertical;outline:none;font-family:inherit}
+.bbar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;z-index:60}
+.send{flex:1;border:0;border-radius:12px;background:var(--accent);color:#111;font-weight:900;font-size:17px;padding:16px;cursor:pointer}
+.send:disabled{opacity:.5}
+.zero{border:1px solid var(--line);border-radius:12px;background:#242838;color:var(--fg);font-weight:700;font-size:13px;padding:0 12px;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ok);color:#111;font-weight:800;font-size:14px;padding:11px 20px;border-radius:30px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:90vw;text-align:center}
+.toast.err{background:var(--warn)}
+.toast.on{opacity:1}
+.empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="hdr" id="hdr">
+  <div class="hrow">
+    <div><div class="ttl">🥪 ОБХОД</div><div class="sub" id="today"></div></div>
+    <span class="pill" id="queue" hidden></span>
+  </div>
+</div>
+
+<div id="home">
+  <div class="tabs" id="tabs"></div>
+  <input class="search" id="q" type="search" placeholder="Търси обект…" autocomplete="off">
+  <div id="list"><div class="empty">Зареждам обектите…</div></div>
+</div>
+
+<div id="objView">
+  <div class="ohdr"><button class="back" onclick="closeObj()">← Обекти</button><div class="oname" id="oname"></div></div>
+  <div id="cats"></div>
+  <button class="more" id="moreBtn" onclick="toggleMore()"></button>
+  <textarea class="note" id="note" placeholder="Бележка (по желание): напр. „взех 5 сандвича за Лаврентий“"></textarea>
+  <div class="bbar">
+    <button class="zero" onclick="allZero()">Всичко 0</button>
+    <button class="send" id="sendBtn" onclick="send()">✓ ИЗПРАТИ ОСТАТЪЦИТЕ</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== ВРЪЗКА С АПИТО ЗА ЗАЯВКИ (същото като в приложението на Мони) =====
+// Остатъците отиват в лист „ОСТАТЪЦИ“ и Мони ги вижда до всеки артикул, когато прави заявката.
+const API = 'https://script.google.com/macros/s/AKfycbzxTtMoij_A6yORV2-OE2RBEF1U5ZkEo1vAQZOMaYW4U_32KPbrKQ-7wnuLbTmMjmJrmQ/exec';
+
+// Артикулите — същите категории и имена като в заявката на Мони, за да се връзват 1:1.
+const CATS = [
+  ['Салати',    ['Свеж микс','Пилешка','Фусили','Овчарска','Риба тон']],
+  ['Тортила',   ['Чоризо','Шунка','Пиле','Салами','Капрезе','Риба Тон','Чипотле']],
+  ['Трамезини', ['Чоризо','Шунка','Пиле','Салами','Чипотле','Яйце']],
+  ['Чабата',    ['Шунка','Риба Тон','Принцеса Пиле','Принцеса Шунка']],
+  ['Крейзи',    ['Луканка','Шунка','Шпек','Пиле']],
+  ['Багети',    ['Шунка','Пиле','Шпек салам','Луканка']],
+  ['Десерти',   ['Еклер','Чийз кейк','Гранола','Тирамису','Профитерол','Торта Домашна','Шоколадова торта']],
+];
+const CHAINS = ['300', 'СИТИ', 'СТАР', 'БУЛМАГ', 'Други'];
+
+const S = { objects: [], deliv: {}, chain: '300', cur: null, qty: {}, showAll: false, sent: {} };
+
+// ---- помощни ----
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+function todayBg() { const d = new Date(); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(); }
+function chainOf(o) { const w = o.split(' ')[0].toUpperCase(); return CHAINS.includes(w) ? w : 'Други'; }
+function shortName(o) { return chainOf(o) === 'Други' || chainOf(o) === 'БУЛМАГ' ? o : o.slice(o.indexOf(' ') + 1); }
+function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+function toast(m, err) { const t = $('toast'); t.textContent = m; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(t._t); t._t = setTimeout(() => t.className = 'toast', 2600); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ---- зареждане: обектите и кой артикул какво получава (от статистиката за 4 седмици) ----
+async function load() {
+  $('today').textContent = 'Днес ' + todayBg();
+  S.chain = ls('obhod_chain') || '300';
+  const sentDay = ls('obhod_sent') || {};
+  S.sent = sentDay.date === todayBg() ? sentDay.objs : {};
+  const cache = ls('obhod_cache');
+  if (cache) apply(cache);
+  try {
+    const r = await fetch(API + '?action=getReturnStatsForMony&weeks=4').then(x => x.json());
+    if (r && r.ok) { apply(r.rows); ls('obhod_cache', r.rows); }
+  } catch (e) { if (!cache) $('list').innerHTML = '<div class="empty">Няма интернет. Опитай пак след малко.</div>'; }
+  flushQueue();
+}
+function apply(rows) {
+  const objs = new Set(), deliv = {};
+  Object.keys(rows).forEach(k => {
+    const [o, c, a] = k.split('|');
+    objs.add(o);
+    if ((rows[k].delivered || 0) > 0) (deliv[o] = deliv[o] || {})[c + '|' + a] = rows[k].delivered;
+  });
+  S.objects = [...objs].sort((a, b) => shortName(a).localeCompare(shortName(b), 'bg'));
+  S.deliv = deliv;
+  renderTabs(); renderList();
+}
+
+// ---- списък с обекти ----
+function renderTabs() {
+  $('tabs').innerHTML = CHAINS.map(c => `<button class="tab ${c === S.chain ? 'on' : ''}" onclick="setChain('${c}')">${c}</button>`).join('');
+}
+function setChain(c) { S.chain = c; ls('obhod_chain', c); $('q').value = ''; renderTabs(); renderList(); }
+function renderList() {
+  const q = $('q').value.trim().toUpperCase();
+  const list = S.objects.filter(o => q ? o.toUpperCase().includes(q) : chainOf(o) === S.chain);
+  $('list').innerHTML = list.length ? list.map(o => {
+    const s = S.sent[o];
+    return `<button class="obj ${s ? 'done' : ''}" onclick="openObj(${JSON.stringify(o).replace(/"/g, '&quot;')})">
+      <span>${esc(q ? o : shortName(o))}</span>${s ? `<small>✓ ${s.time} · ${s.total} бр.</small>` : ''}</button>`;
+  }).join('') : '<div class="empty">Няма такъв обект.</div>';
+}
+$('q').addEventListener('input', renderList);
+
+// ---- екран на обекта ----
+function openObj(o) {
+  S.cur = o; S.qty = {}; S.showAll = false;
+  const draft = ls('obhod_draft_' + o);
+  if (draft && draft.date === todayBg()) { S.qty = draft.qty || {}; $('note').value = draft.note || ''; } else $('note').value = '';
+  $('oname').textContent = o;
+  $('home').hidden = true; $('objView').classList.add('show');
+  document.documentElement.style.setProperty('--hdrH', $('hdr').offsetHeight + 'px');
+  renderObj(); window.scrollTo(0, 0);
+}
+function closeObj() { $('objView').classList.remove('show'); $('home').hidden = false; S.cur = null; renderList(); }
+function usual(c, a) { return (S.deliv[S.cur] || {})[c + '|' + a] || 0; }
+function renderObj() {
+  const hasUsual = Object.keys(S.deliv[S.cur] || {}).length > 0;
+  let html = '', hidden = 0;
+  CATS.forEach(([c, arts]) => {
+    const rows = arts.filter(a => S.showAll || !hasUsual || usual(c, a) > 0 || (S.qty[c + '|' + a] || 0) > 0);
+    hidden += arts.length - rows.length;
+    if (!rows.length) return;
+    const tot = rows.reduce((s, a) => s + (S.qty[c + '|' + a] || 0), 0);
+    html += `<div class="cat"><div class="cath"><span>${c}</span><span>${tot || ''}</span></div>` + rows.map(a => {
+      const k = c + '|' + a, v = S.qty[k] || 0, u = usual(c, a);
+      return `<div class="row"><span class="nm">${esc(a)}${u ? `<span class="h">доставени за 4 седм.: ${u}</span>` : ''}</span>
+        <div class="qw"><button class="qb" onclick="chg('${k}',-1)" aria-label="по-малко">−</button>
+        <span class="qv ${v ? 'has' : ''}">${v}</span>
+        <button class="qb" onclick="chg('${k}',1)" aria-label="повече">+</button></div></div>`;
+    }).join('') + '</div>';
+  });
+  $('cats').innerHTML = html;
+  $('moreBtn').hidden = !hasUsual || (!S.showAll && hidden === 0);
+  $('moreBtn').textContent = S.showAll ? 'Покажи само артикулите на обекта' : `+ Още ${hidden} артикула`;
+  const total = Object.values(S.qty).reduce((s, v) => s + v, 0);
+  $('sendBtn').textContent = total ? `✓ ИЗПРАТИ ОСТАТЪЦИТЕ (${total} бр.)` : '✓ ИЗПРАТИ: НЯМА ОСТАТЪЦИ';
+}
+function chg(k, d) { S.qty[k] = Math.max(0, (S.qty[k] || 0) + d); if (!S.qty[k]) delete S.qty[k]; saveDraft(); renderObj(); }
+function allZero() { S.qty = {}; saveDraft(); renderObj(); }
+function toggleMore() { S.showAll = !S.showAll; renderObj(); }
+function saveDraft() { ls('obhod_draft_' + S.cur, { date: todayBg(), qty: S.qty, note: $('note').value }); }
+$('note').addEventListener('input', saveDraft);
+
+// ---- изпращане (с опашка, ако няма интернет) ----
+async function post(payload) {
+  const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'saveLeftovers', payload }) });
+  const j = JSON.parse(await res.text());
+  if (!j.ok) throw new Error(j.error || 'грешка');
+  return j;
+}
+async function send() {
+  const o = S.cur, note = $('note').value.trim();
+  const rows = Object.keys(S.qty).map(k => { const [cat, art] = k.split('|'); return { obekt: o, cat, art, qty: S.qty[k], note: '' }; });
+  // „Няма остатъци“ също е информация — записва се като ред с 0, за да знае Мони, че обектът е проверен.
+  if (!rows.length) rows.push({ obekt: o, cat: '', art: 'Няма остатъци', qty: 0, note: '' });
+  if (note) rows[0].note = note;
+  const payload = { date: todayBg(), source: 'Обход (приложение)', rows };
+  const total = rows.reduce((s, r) => s + r.qty, 0);
+  $('sendBtn').disabled = true;
+  try {
+    await post(payload);
+    toast('✓ Изпратено: ' + shortName(o));
+  } catch (e) {
+    const q = ls('obhod_queue') || []; q.push(payload); ls('obhod_queue', q);
+    toast('Няма връзка — ще се изпрати автоматично', true);
+  }
+  $('sendBtn').disabled = false;
+  const d = new Date();
+  S.sent[o] = { time: pad(d.getHours()) + ':' + pad(d.getMinutes()), total };
+  ls('obhod_sent', { date: todayBg(), objs: S.sent });
+  try { localStorage.removeItem('obhod_draft_' + o); } catch (e) {}
+  showQueue(); closeObj();
+}
+async function flushQueue() {
+  const q = ls('obhod_queue') || [];
+  const left = [];
+  for (const p of q) { try { await post(p); } catch (e) { left.push(p); } }
+  ls('obhod_queue', left); showQueue();
+  if (q.length && !left.length) toast('✓ Изпратени и чакащите остатъци');
+}
+function showQueue() { const n = (ls('obhod_queue') || []).length; $('queue').hidden = !n; $('queue').className = 'pill warn'; $('queue').textContent = n + ' чакат интернет'; }
+window.addEventListener('online', flushQueue);
+
+load();
+</script>
+</body>
+</html>
