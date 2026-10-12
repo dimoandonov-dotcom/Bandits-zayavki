@@ -367,7 +367,9 @@ async function send() {
   // „Няма остатъци“ също е информация — записва се като ред с 0, за да знае Мони, че обектът е проверен.
   if (!rows.length) rows.push({ obekt: o, cat: '', art: 'Няма остатъци', qty: 0, note: '' });
   if (note) rows[0].note = (rows[0].note ? rows[0].note + ' · ' : '') + note;
-  const payload = { date: todayBg(), source: 'Обход (приложение)', rows };
+  const now = new Date();
+  // Часът е в „източник“ (текст), защото колоната „Час“ в таблицата Google я превръща в дата от 1899 г.
+  const payload = { date: todayBg(), source: 'Обход ' + pad(now.getHours()) + ':' + pad(now.getMinutes()), rows };
   const total = rows.reduce((s, r) => s + r.qty, 0);
   const soldTot = keys.reduce((s, k) => s + Math.max(0, (B[k] || 0) - (S.qty[k] || 0)), 0);
   $('sendBtn').disabled = true;
