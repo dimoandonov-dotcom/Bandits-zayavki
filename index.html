@@ -333,9 +333,9 @@ let curMode = 'obj';
 let saveTimer = null;
 
 // ===== AUTO-SAVE =====
-function autoSave() {
+function autoSave(vednaga) {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=>{
+  const zapishi = () => {
     try {
       const data = {WB, sheets, dates:{
         prodDate: document.getElementById('dProdDate')?.value || '',
@@ -347,7 +347,8 @@ function autoSave() {
       // Show small indicator
       showAutoSaveBadge();
     } catch(e) { console.error('Save failed', e); }
-  }, 500);
+  };
+  if (vednaga) zapishi(); else saveTimer = setTimeout(zapishi, 500);
 }
 
 function showAutoSaveBadge() {
@@ -549,6 +550,14 @@ function showApp() {
 // On page load - показваме архива (start screen)
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(()=>{
+    // След самообновяване се връщаме точно там, където беше - а не на началния
+    // екран. Черновата е записана непосредствено преди презареждането.
+    let продължи = false;
+    try { продължи = localStorage.getItem('bandits_update_resume') === '1'; } catch(e) {}
+    if (продължи) {
+      try { localStorage.removeItem('bandits_update_resume'); } catch(e) {}
+      if (hasUnfinishedDraft()) { resumeDraft(); toast('✨ Обновено'); return; }
+    }
     renderStartScreen();
   }, 100);
 });
@@ -890,6 +899,7 @@ function backToList() {
   document.getElementById('editView').classList.remove('show');
   document.getElementById('objView').style.display='block';
   renderObjList();
+  if (typeof пуснЧакащо === 'function') пуснЧакащо();
 }
 
 // ===== TOTALS =====
@@ -948,6 +958,7 @@ function closePrintModalEdit() {
 
 function closePrintModal() {
   document.getElementById('printModal').style.display='none';
+  if (typeof пуснЧакащо === 'function') пуснЧакащо();
 }
 
 function updateFileName() {
@@ -1291,7 +1302,8 @@ async function openRetModal() {
   document.getElementById('retBox').innerHTML = html;
   document.getElementById('retModal').classList.add('show');
 }
-function closeRetModal() { document.getElementById('retModal').classList.remove('show'); }
+function closeRetModal() { document.getElementById('retModal').classList.remove('show');
+  if (typeof пуснЧакащо === 'function') пуснЧакащо(); }
 function setHotQty(h) {
   const it = WB[h.sn].categories[h.ci].items[h.ii];
   it.qtys[h.obj] = h.sugg;
@@ -1667,6 +1679,65 @@ if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+// ---------------------------------------------------------------------------
+//  САМООБНОВЯВАНЕ
+//  Приложението се проверява само: при отваряне, на всеки 5 минути и всеки път,
+//  когато Мони се върне в него. Намери ли нова версия, презарежда се.
+//  Две неща пази:
+//   * никога не прекъсва работа - докато е отворен обект или прозорецът за
+//     печат, обновяването чака да се излезе оттам;
+//   * не губи заявката - черновата се записва НЕЗАБАВНО преди презареждането и
+//     при отварянето се възстановява сама, вместо да се пада на началния екран.
+//  Проверява и service worker-а: иначе телефонът може да държи стара версия,
+//  колкото и пъти да се отваря приложението.
+// ---------------------------------------------------------------------------
+function hashText(t) { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return h; }
+let VER_HASH = null, PENDING_RELOAD = false;
+
+function zaetSum() {
+  const ev = document.getElementById('editView');
+  if (ev && ev.classList.contains('show')) return true;
+  const pm = document.getElementById('printModal');
+  if (pm && pm.style.display && pm.style.display !== 'none') return true;
+  const rm = document.getElementById('retModal');
+  if (rm && rm.classList.contains('show')) return true;
+  return false;
+}
+
+function reloadNow() {
+  try {
+    if (typeof sheets !== 'undefined' && sheets.length) {
+      autoSave(true);
+      localStorage.setItem('bandits_update_resume', '1');
+    }
+  } catch (e) {}
+  toast('✨ Има нова версия — обновявам…');
+  setTimeout(() => location.reload(), 1200);
+}
+
+async function checkUpdate() {
+  try {
+    const t = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' })
+                    .then(r => r.ok ? r.text() : '');
+    if (t) {
+      const h = hashText(t);
+      if (VER_HASH === null) VER_HASH = h;
+      else if (h !== VER_HASH) { if (zaetSum()) PENDING_RELOAD = true; else reloadNow(); }
+    }
+  } catch (e) { /* няма интернет - пробваме пак по-късно */ }
+  if (navigator.serviceWorker) {
+    try { const reg = await navigator.serviceWorker.getRegistration(); if (reg) reg.update(); } catch (e) {}
+  }
+}
+
+// Щом се излезе от обект или от прозореца за печат - чакащото обновяване влиза.
+function пуснЧакащо() { if (PENDING_RELOAD && !zaetSum()) { PENDING_RELOAD = false; reloadNow(); } }
+
+checkUpdate();
+setInterval(checkUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkUpdate();
+});
 </script>
 </body>
 </html>
