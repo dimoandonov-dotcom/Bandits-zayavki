@@ -1096,6 +1096,27 @@ function autoLoadDebounced() {
   if (!/^\d{2}\.\d{2}\.\d{4}$/.test(v.trim())) return;   // още не е дописана
   AUTOLOAD_TIMER = setTimeout(() => autoLoadPreviousOrder(), 700);
 }
+function дорисувайЛистове(rows) {
+  const ред = sheets.filter(sn => WB[sn] && WB[sn].objects);
+  if (!ред.length) return rows;
+  const листовеНа = obj => ред.filter(sn => WB[sn].objects.includes(obj));
+  let поз = 0;
+  return rows.map(r => {
+    if (r.sheet && WB[r.sheet] && WB[r.sheet].objects.includes(r.obekt)) {
+      const i = ред.indexOf(r.sheet);
+      if (i >= 0) поз = i;
+      return r;
+    }
+    const инд = листовеНа(r.obekt).map(sn => ред.indexOf(sn)).sort((a, b) => a - b);
+    if (!инд.length) return r;
+    const напред = инд.filter(i => i >= поз);
+    const избор = напред.indexOf(поз) >= 0 ? поз
+                : (напред.length ? напред[0] : инд[инд.length - 1]);
+    поз = избор;
+    return Object.assign({}, r, { sheet: ред[избор] });
+  });
+}
+
 async function autoLoadPreviousOrder(manual) {
   const delVal = (document.getElementById('dDelDate')||{}).value || '';
   if (!bgDateOk(delVal)) { if (manual) toast('Първо попълни датата на доставка'); return; }
@@ -1115,6 +1136,15 @@ async function autoLoadPreviousOrder(manual) {
       renderObjList(); renderEditObj();
       return;
     }
+    // Старите заявки са записани БЕЗ лист, а „Възраждане" го има и на Сити, и на
+    // 300-А. Редовете обаче са записани ЛИСТ ПО ЛИСТ, в реда на листовете във
+    // файла - затова липсващият лист се възстановява от позицията: върви се по
+    // редовете и листът се сменя само напред, щом се срещне обект, който е само
+    // на по-следващ лист. Проверено върху две заявки с известни листове:
+    // 772/772 и 688/688 верни; при заявката от 13.10 разделя двата Възраждане
+    // точно както са били (Сити с трамезин яйце, 300-А с крейзи и багети).
+    if (prevRes.rows && prevRes.rows.length) prevRes.rows = дорисувайЛистове(prevRes.rows);
+
     // Името в предната заявка е КЪСО („Възраждане") и съществува на повече от
     // един лист: има и СИТИ ВЪЗРАЖДАНЕ, и 300 ВЪЗРАЖДАНЕ - различни магазини на
     // различни фирми. Същото за Калитин (300-Б/Стар) и Македония (300-А/Стар).
