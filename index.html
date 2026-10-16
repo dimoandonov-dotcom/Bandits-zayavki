@@ -1104,11 +1104,32 @@ async function autoLoadPreviousOrder(manual) {
       renderObjList(); renderEditObj();
       return;
     }
-    let matched = 0, total = prevRes.rows.length;
+    // Името в предната заявка е КЪСО („Възраждане") и съществува на повече от
+    // един лист: има и СИТИ ВЪЗРАЖДАНЕ, и 300 ВЪЗРАЖДАНЕ - различни магазини на
+    // различни фирми. Същото за Калитин (300-Б/Стар) и Македония (300-А/Стар).
+    // Дотук редът се записваше на ВСЕКИ лист с такова име, тоест историята на
+    // единия магазин се изсипваше и в другия - оттам идваха разминатите бройки
+    // при еклерите и крейзитата. Сега: ако предната заявка носи листа, редът
+    // отива само там; ако не го носи, попълва се само когато името е на ЕДИН
+    // лист. Двусмисленото се пропуска и се казва, вместо да се гади.
+    let matched = 0, propusnati = 0;
+    const propusnatiImena = new Set();
+    const total = prevRes.rows.length;
+    const listoveS = obj => sheets.filter(sn => WB[sn] && WB[sn].objects.includes(obj));
     prevRes.rows.forEach(row => {
-      sheets.forEach(sn => {
+      let celi;
+      if (row.sheet && WB[row.sheet] && WB[row.sheet].objects.includes(row.obekt)) {
+        celi = [row.sheet];
+      } else {
+        const vsichki = listoveS(row.obekt);
+        if (vsichki.length === 1) celi = vsichki;
+        else {
+          if (vsichki.length > 1) { propusnati++; propusnatiImena.add(row.obekt); }
+          return;
+        }
+      }
+      celi.forEach(sn => {
         const d = WB[sn];
-        if (!d.objects.includes(row.obekt)) return;
         d.categories.forEach(cat => {
           if (cat.name !== row.cat) return;
           cat.items.forEach(item => {
@@ -1123,7 +1144,8 @@ async function autoLoadPreviousOrder(manual) {
     PREV_ORDER_LOADED_FOR = delVal;
     autoSave();
     renderObjList(); renderEditObj();
-    toast(`📋 Заредена заявка от ${prevRes.dateDelivery} (v${prevRes.version}) — ${matched}/${total} съвпадения`);
+    toast(`📋 Заредена заявка от ${prevRes.dateDelivery} (v${prevRes.version}) — ${matched}/${total} съвпадения`
+      + (propusnati ? ` · ${[...propusnatiImena].join(', ')}: попълни на ръка (името е на два листа)` : ''));
   } catch (e) {
     console.warn('Автозареждане на предна заявка неуспешно:', e);
   }

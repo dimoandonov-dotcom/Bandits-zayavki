@@ -1,4 +1,7 @@
-const CACHE = 'bandits-v1';
+// Името на кеша се сменя при всяка промяна на страницата. Браузърът инсталира
+// нов service worker само когато ТОЗИ файл се промени - докато името стоеше
+// „bandits-v1", новата страница не стигаше до телефона на Мони изобщо.
+const CACHE = 'bandits-v2-2026-10-16';
 const FILES = [
   '/',
   '/index.html',
@@ -19,8 +22,23 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Самата страница се тегли ПЪРВО от мрежата и се пази копие за без интернет.
+// Така поправка се вижда още при следващото отваряне, вместо да чака изтриване
+// на кеша. Останалото (библиотеката от CDN) си остава кеш първо - то не се мени.
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(()=>{}))
-  );
+  const req = e.request;
+  const стрaница = req.mode === 'navigate'
+    || (req.destination === 'document')
+    || /\/(index\.html)?(\?.*)?$/.test(new URL(req.url).pathname) && new URL(req.url).origin === self.location.origin;
+  if (стрaница) {
+    e.respondWith(
+      fetch(req).then(r => {
+        const копие = r.clone();
+        caches.open(CACHE).then(c => c.put(req, копие)).catch(()=>{});
+        return r;
+      }).catch(() => caches.match(req).then(r => r || caches.match('/index.html')))
+    );
+    return;
+  }
+  e.respondWith(caches.match(req).then(r => r || fetch(req).catch(()=>{})));
 });
